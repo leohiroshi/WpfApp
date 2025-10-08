@@ -1,12 +1,19 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using WpfApp.Services;
 
 namespace WpfApp.ViewModels
 {
-    internal class MainViewModel
+    public class MainViewModel : BaseViewModel
     {
+        public PessoasViewModel PessoasVM { get; }
+        public ProdutosViewModel ProdutosVM { get; }
+        // Se tiver uma aba “Pedidos”, crie também um PedidosViewModel
+
+        public MainViewModel(PessoaRepository pessoaRepo,
+                             ProdutoRepository produtoRepo,
+                             PedidoRepository pedidoRepo)
+        {
+            PessoasVM = new PessoasViewModel(pessoaRepo, produtoRepo, pedidoRepo);
+            ProdutosVM = new ProdutosViewModel(produtoRepo);
+        }
     }
 }

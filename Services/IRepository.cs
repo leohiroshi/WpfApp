@@ -1,12 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace WpfApp.Services
 {
-    internal interface IRepository
+    public interface IRepository<T>
     {
+        IEnumerable<T> GetAll();
+        T GetById(int id);
+        T Add(T entity);
+        void Update(T entity);
+        bool Delete(int id);
+
+        int NextId(Func<T, int> idSelector);
     }
 }

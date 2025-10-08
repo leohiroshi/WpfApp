@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace WpfApp.Models
 {
-    public class Produtos
+    public class Produto
     {
         public int Id { get; set; }
 
