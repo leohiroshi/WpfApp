@@ -11,6 +11,9 @@
             <TabItem Header="Produtos" DataContext="{Binding ProdutosVM}">
                 <views:ProdutosView />
             </TabItem>
+            <TabItem Header="Pedidos" DataContext="{Binding PedidosVM}">
+                <views:PedidoView />
+            </TabItem>
         </TabControl>
     </Grid>
 </Window>

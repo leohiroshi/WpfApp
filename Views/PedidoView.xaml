@@ -1,14 +1,147 @@
-﻿<Page x:Class="WpfApp.Views.PedidoView"
-      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-      xmlns:local="clr-namespace:WpfApp.Views"
-      mc:Ignorable="d" 
-      d:DesignHeight="450" d:DesignWidth="800"
-      Title="PedidoView">
+﻿<UserControl x:Class="WpfApp.Views.PedidoView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
-    <Grid>
-     
+        <!-- Filtros -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Pessoa:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBox Width="180" Text="{Binding FiltroPessoa, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,10,0"/>
+
+            <TextBlock Text="Status:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <ComboBox Width="140" SelectedItem="{Binding FiltroStatus}" IsEditable="False">
+                <ComboBoxItem Content="(Todos)" Tag="{x:Null}" IsSelected="True"/>
+                <ComboBoxItem Content="Pendente"/>
+                <ComboBoxItem Content="Pago"/>
+                <ComboBoxItem Content="Enviado"/>
+                <ComboBoxItem Content="Recebido"/>
+            </ComboBox>
+
+            <TextBlock Text="Data Ini:" VerticalAlignment="Center" Margin="10,0,6,0"/>
+            <DatePicker SelectedDate="{Binding FiltroDataIni}" Width="130"/>
+
+            <TextBlock Text="Data Fim:" VerticalAlignment="Center" Margin="10,0,6,0"/>
+            <DatePicker SelectedDate="{Binding FiltroDataFim}" Width="130" Margin="0,0,10,0"/>
+
+            <Button Content="Buscar" Command="{Binding BuscarCommand}" />
+            <Button Content="Recarregar" Command="{Binding CarregarCommand}" Margin="6,0,0,0"/>
+        </StackPanel>
+
+        <!-- Grid de Pedidos -->
+        <DataGrid Grid.Row="1"
+                  ItemsSource="{Binding Pedidos}"
+                  SelectedItem="{Binding PedidoSelecionado}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="#" Binding="{Binding Id}" Width="60"/>
+                <DataGridTextColumn Header="Pessoa" Binding="{Binding PessoaNome}" Width="2*"/>
+
+                <DataGridTextColumn Header="Data" Width="170">
+                    <DataGridTextColumn.Binding>
+                        <Binding Path="DataVenda" StringFormat="{}{0:dd/MM/yyyy HH:mm}" />
+                    </DataGridTextColumn.Binding>
+                </DataGridTextColumn>
+
+                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="120"/>
+
+                <!-- Aqui usar ValorTotal -->
+                <DataGridTextColumn Header="Total" Width="120">
+                    <DataGridTextColumn.Binding>
+                        <Binding Path="ValorTotal" StringFormat="{}{0:C2}" />
+                    </DataGridTextColumn.Binding>
+                </DataGridTextColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Edição do Pedido -->
+        <GroupBox Grid.Row="2" Header="Edição" Margin="0,8,0,0">
+            <Grid Margin="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Linha 1: pessoa e total -->
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Pessoa:" VerticalAlignment="Center"/>
+                    <ComboBox Width="250" Margin="6,0,12,0"
+                              ItemsSource="{Binding Pessoas}"
+                              DisplayMemberPath="Nome"
+                              SelectedItem="{Binding PessoaSelecionadaEdicao}"/>
+
+                    <TextBlock Text="Total:" VerticalAlignment="Center"/>
+                    <TextBlock Margin="6,0,0,0" FontWeight="Bold">
+                        <TextBlock.Text>
+                            <!-- Aqui usar EditBuffer.ValorTotal -->
+                            <Binding Path="EditBuffer.ValorTotal" StringFormat="{}{0:C2}" />
+                        </TextBlock.Text>
+                    </TextBlock>
+                </StackPanel>
+
+                <!-- Linha 2: Itens -->
+                <Grid Grid.Row="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,6">
+                        <TextBlock Text="Produto:" VerticalAlignment="Center"/>
+                        <ComboBox Width="250" Margin="6,0,12,0"
+                                  ItemsSource="{Binding Produtos}"
+                                  DisplayMemberPath="Nome"
+                                  SelectedItem="{Binding ProdutoSelecionadoParaAdicionar}"/>
+
+                        <TextBlock Text="Qtde:" VerticalAlignment="Center"/>
+                        <TextBox Width="80" Margin="6,0,12,0" Text="{Binding QtdeParaAdicionar, UpdateSourceTrigger=PropertyChanged}"/>
+
+                        <Button Content="Adicionar" Command="{Binding AdicionarItemCommand}" />
+                        <Button Content="Remover" Command="{Binding RemoverItemCommand}" Margin="6,0,0,0"/>
+                    </StackPanel>
+
+                    <DataGrid Grid.Row="1"
+                              ItemsSource="{Binding ItensEdit}"
+                              SelectedItem="{Binding ItemSelecionado}"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True">
+                        <DataGrid.Columns>
+                            <!-- Aqui usar ProdutoNome -->
+                            <DataGridTextColumn Header="Produto" Binding="{Binding ProdutoNome}" Width="2*"/>
+
+                            <DataGridTextColumn Header="Quantidade" Binding="{Binding Quantidade}" Width="120"/>
+
+                            <DataGridTextColumn Header="Valor Unit." Width="140">
+                                <DataGridTextColumn.Binding>
+                                    <Binding Path="ValorUnitario" StringFormat="{}{0:C2}" />
+                                </DataGridTextColumn.Binding>
+                            </DataGridTextColumn>
+
+                            <!-- Aqui usar TotalItem -->
+                            <DataGridTextColumn Header="Subtotal" Width="140">
+                                <DataGridTextColumn.Binding>
+                                    <Binding Path="TotalItem" StringFormat="{}{0:C2}" />
+                                </DataGridTextColumn.Binding>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+
+                <!-- Linha 3: botões -->
+                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                    <Button Content="Incluir" Command="{Binding IncluirCommand}" Margin="0,0,6,0"/>
+                    <Button Content="Editar" Command="{Binding EditarCommand}" Margin="0,0,6,0"/>
+                    <Button Content="Salvar" Command="{Binding SalvarCommand}" Margin="0,0,6,0"/>
+                    <Button Content="Finalizar" Command="{Binding FinalizarCommand}" Margin="0,0,6,0"/>
+                    <Button Content="Excluir" Command="{Binding ExcluirCommand}"/>
+                </StackPanel>
+            </Grid>
+        </GroupBox>
     </Grid>
-</Page>
+</UserControl>
