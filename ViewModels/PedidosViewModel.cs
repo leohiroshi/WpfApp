@@ -11,17 +11,49 @@ namespace WpfApp.ViewModels
     public class PedidosViewModel : BaseViewModel
     {
         private readonly PedidoRepository _pedidosRepo;
-        private readonly PessoaRepository _pessoasRepo;
+        public PessoaRepository _pessoasRepo;
         private readonly ProdutoRepository _produtosRepo;
         private readonly PedidoService _pedidoService;
+
+        // Lista de valores do enum FormaPagamento para bindar no ComboBox
+        public Array FormaPagamentoValues { get; } = Enum.GetValues(typeof(FormaPagamento));
 
         public ObservableCollection<Pedido> Pedidos { get; } = new();
         public ObservableCollection<Pessoa> Pessoas { get; } = new();
         public ObservableCollection<Produto> Produtos { get; } = new();
         public ObservableCollection<PedidoItem> ItensEdit { get; } = new();
 
-        private Pedido _pedidoSelecionado;
-        public Pedido PedidoSelecionado
+        // Pessoa selecionada (filtro no header)
+        private Pessoa? _pessoaSelecionada;
+        public Pessoa? PessoaSelecionada
+        {
+            get => _pessoaSelecionada;
+            set
+            {
+                if (SetProperty(ref _pessoaSelecionada, value))
+                {
+                    AplicarFiltroPessoaSelecionada();
+                }
+            }
+        }
+
+        // Pessoa selecionada (binding de ComboBox em criação/edição)
+        private Pessoa? _pessoaSelecionadaEdicao;
+        public Pessoa? PessoaSelecionadaEdicao
+        {
+            get => _pessoaSelecionadaEdicao;
+            set
+            {
+                if (SetProperty(ref _pessoaSelecionadaEdicao, value) && value != null)
+                {
+                    EditBuffer.PessoaId = value.Id;
+                    EditBuffer.PessoaNome = value.Nome;
+                }
+            }
+        }
+
+        private Pedido? _pedidoSelecionado;
+        public Pedido? PedidoSelecionado
         {
             get => _pedidoSelecionado;
             set
@@ -55,12 +87,21 @@ namespace WpfApp.ViewModels
 
                         PessoaSelecionadaEdicao = Pessoas.FirstOrDefault(p => p.Id == EditBuffer.PessoaId);
                         RecalcularTotal();
+                        // Update CanExecutes for status commands
+                        MarcarPagoCommand?.RaiseCanExecuteChanged();
+                        MarcarEnviadoCommand?.RaiseCanExecuteChanged();
+                        MarcarRecebidoCommand?.RaiseCanExecuteChanged();
+                        FinalizarSelecionadoCommand?.RaiseCanExecuteChanged();
                     }
                     else
                     {
                         ItensEdit.Clear();
                         PessoaSelecionadaEdicao = null;
                         EditBuffer = new Pedido();
+                        MarcarPagoCommand?.RaiseCanExecuteChanged();
+                        MarcarEnviadoCommand?.RaiseCanExecuteChanged();
+                        MarcarRecebidoCommand?.RaiseCanExecuteChanged();
+                        FinalizarSelecionadoCommand?.RaiseCanExecuteChanged();
                     }
                 }
             }
@@ -95,6 +136,61 @@ namespace WpfApp.ViewModels
             set => SetProperty(ref _filtroDataFim, value);
         }
 
+        // Filtros adicionais exclusivos
+        private bool _mostrarApenasEntregues;
+        public bool MostrarApenasEntregues
+        {
+            get => _mostrarApenasEntregues;
+            set
+            {
+                if (SetProperty(ref _mostrarApenasEntregues, value))
+                {
+                    if (value)
+                    {
+                        _mostrarApenasPagos = false; RaisePropertyChanged(nameof(MostrarApenasPagos));
+                        _mostrarApenasPendentesPagamento = false; RaisePropertyChanged(nameof(MostrarApenasPendentesPagamento));
+                    }
+                    Buscar();
+                }
+            }
+        }
+
+        private bool _mostrarApenasPagos;
+        public bool MostrarApenasPagos
+        {
+            get => _mostrarApenasPagos;
+            set
+            {
+                if (SetProperty(ref _mostrarApenasPagos, value))
+                {
+                    if (value)
+                    {
+                        _mostrarApenasEntregues = false; RaisePropertyChanged(nameof(MostrarApenasEntregues));
+                        _mostrarApenasPendentesPagamento = false; RaisePropertyChanged(nameof(MostrarApenasPendentesPagamento));
+                    }
+                    Buscar();
+                }
+            }
+        }
+
+        private bool _mostrarApenasPendentesPagamento;
+        public bool MostrarApenasPendentesPagamento
+        {
+            get => _mostrarApenasPendentesPagamento;
+            set
+            {
+                if (SetProperty(ref _mostrarApenasPendentesPagamento, value))
+                {
+                    if (value)
+                    {
+                        _mostrarApenasEntregues = false; RaisePropertyChanged(nameof(MostrarApenasEntregues));
+                        _mostrarApenasPagos = false; RaisePropertyChanged(nameof(MostrarApenasPagos));
+                    }
+                    Buscar();
+                }
+            }
+        }
+
         // Edição
         private Pedido _editBuffer = new();
         public Pedido EditBuffer
@@ -103,22 +199,15 @@ namespace WpfApp.ViewModels
             set => SetProperty(ref _editBuffer, value);
         }
 
-        private Pessoa _pessoaSelecionadaEdicao;
-        public Pessoa PessoaSelecionadaEdicao
+        private bool _isModalPedidoVisible;
+        public bool IsModalPedidoVisible
         {
-            get => _pessoaSelecionadaEdicao;
-            set
-            {
-                if (SetProperty(ref _pessoaSelecionadaEdicao, value) && value != null)
-                {
-                    EditBuffer.PessoaId = value.Id;
-                    EditBuffer.PessoaNome = value.Nome;
-                }
-            }
+            get => _isModalPedidoVisible;
+            set => SetProperty(ref _isModalPedidoVisible, value);
         }
 
-        private Produto _produtoSelecionadoParaAdicionar;
-        public Produto ProdutoSelecionadoParaAdicionar
+        private Produto? _produtoSelecionadoParaAdicionar;
+        public Produto? ProdutoSelecionadoParaAdicionar
         {
             get => _produtoSelecionadoParaAdicionar;
             set => SetProperty(ref _produtoSelecionadoParaAdicionar, value);
@@ -158,8 +247,15 @@ namespace WpfApp.ViewModels
         public RelayCommand SalvarCommand { get; }
         public RelayCommand ExcluirCommand { get; }
         public RelayCommand FinalizarCommand { get; }
+        public RelayCommand FinalizarSelecionadoCommand { get; }
+        public RelayCommand MarcarPagoCommand { get; }
+        public RelayCommand MarcarEnviadoCommand { get; }
+        public RelayCommand MarcarRecebidoCommand { get; }
         public RelayCommand AdicionarItemCommand { get; }
         public RelayCommand RemoverItemCommand { get; }
+        public RelayCommand AbrirModalPedidoCommand { get; }
+        public RelayCommand FecharModalPedidoCommand { get; }
+        public RelayCommand LimparFiltrosCommand { get; }
 
         public PedidosViewModel(PedidoRepository pedidosRepo,
                                 PessoaRepository pessoasRepo,
@@ -171,17 +267,44 @@ namespace WpfApp.ViewModels
             _produtosRepo = produtosRepo;
             _pedidoService = pedidoService;
 
+            // Inicializações de seleção nulas
+            _pessoaSelecionada = null;
+            _pedidoSelecionado = null;
+            _pessoaSelecionadaEdicao = null;
+            _produtoSelecionadoParaAdicionar = null;
+            _itemSelecionado = null;
+
             CarregarCommand = new RelayCommand(Carregar);
             BuscarCommand = new RelayCommand(Buscar);
             IncluirCommand = new RelayCommand(Incluir, () => !IsEditando);
-            EditarCommand = new RelayCommand(Editar, () => PedidoSelecionado != null && !IsEditando);
-            SalvarCommand = new RelayCommand(Salvar, () => IsEditando);
+            EditarCommand = new RelayCommand(Editar, () => PedidoSelecionado != null && !IsEditando && (PedidoSelecionado?.IsFinalizado != true));
+            SalvarCommand = new RelayCommand(Salvar, () => IsEditando && !EditBuffer.IsFinalizado && ItensEdit.Count > 0);
             ExcluirCommand = new RelayCommand(Excluir, () => PedidoSelecionado != null && !IsEditando);
-            FinalizarCommand = new RelayCommand(Finalizar, () => IsEditando && (EditBuffer?.Itens?.Count > 0));
+            FinalizarCommand = new RelayCommand(Finalizar, () => IsEditando && ItensEdit.Count > 0);
+            FinalizarSelecionadoCommand = new RelayCommand(FinalizarSelecionado, () => PedidoSelecionado != null && PedidoSelecionado.IsFinalizado == false);
+            MarcarPagoCommand = new RelayCommand(() => MarcarStatus(StatusPedido.Pago), () => PedidoSelecionado != null && PedidoSelecionado.IsFinalizado && PedidoSelecionado.Status != StatusPedido.Pago);
+            MarcarEnviadoCommand = new RelayCommand(() => MarcarStatus(StatusPedido.Enviado), () => PedidoSelecionado != null && PedidoSelecionado.IsFinalizado && PedidoSelecionado.Status != StatusPedido.Enviado);
+            MarcarRecebidoCommand = new RelayCommand(() => MarcarStatus(StatusPedido.Recebido), () => PedidoSelecionado != null && PedidoSelecionado.IsFinalizado && PedidoSelecionado.Status != StatusPedido.Recebido);
             AdicionarItemCommand = new RelayCommand(AdicionarItem, () => IsEditando && ProdutoSelecionadoParaAdicionar != null && QtdeParaAdicionar > 0);
             RemoverItemCommand = new RelayCommand(RemoverItem, () => IsEditando && ItemSelecionado != null);
+            AbrirModalPedidoCommand = new RelayCommand(() => { Incluir(); IsModalPedidoVisible = true; });
+            FecharModalPedidoCommand = new RelayCommand(() => { IsEditando = false; IsModalPedidoVisible = false; ItensEdit.Clear(); EditBuffer = new Pedido(); });
+            LimparFiltrosCommand = new RelayCommand(LimparFiltros);
 
             Carregar();
+        }
+
+        private void LimparFiltros()
+        {
+            FiltroPessoa = string.Empty;
+            FiltroStatus = null;
+            FiltroDataIni = null;
+            FiltroDataFim = null;
+            PessoaSelecionada = null;
+            MostrarApenasEntregues = false;
+            MostrarApenasPagos = false;
+            MostrarApenasPendentesPagamento = false;
+            Buscar();
         }
 
         private void RecalcularTotal()
@@ -202,9 +325,23 @@ namespace WpfApp.ViewModels
                 Pedidos.Add(ped);
         }
 
+        private void AplicarFiltroPessoaSelecionada()
+        {
+            var query = _pedidosRepo.GetAll().AsQueryable();
+            if (PessoaSelecionada != null)
+                query = query.Where(p => p.PessoaId == PessoaSelecionada.Id);
+
+            Pedidos.Clear();
+            foreach (var ped in query.OrderByDescending(p => p.DataVenda ?? DateTime.MinValue))
+                Pedidos.Add(ped);
+        }
+
         private void Buscar()
         {
             var query = _pedidosRepo.GetAll().AsQueryable();
+
+            if (PessoaSelecionada != null)
+                query = query.Where(p => p.PessoaId == PessoaSelecionada.Id);
 
             if (!string.IsNullOrWhiteSpace(FiltroPessoa))
                 query = query.Where(p => (p.PessoaNome ?? string.Empty).Contains(FiltroPessoa, StringComparison.OrdinalIgnoreCase));
@@ -223,6 +360,15 @@ namespace WpfApp.ViewModels
                 var dataFim = FiltroDataFim.Value.Date;
                 query = query.Where(p => (p.DataVenda ?? DateTime.MinValue).Date <= dataFim);
             }
+
+            if (MostrarApenasEntregues)
+                query = query.Where(p => p.Status == StatusPedido.Recebido);
+
+            if (MostrarApenasPagos)
+                query = query.Where(p => p.Status == StatusPedido.Pago);
+
+            if (MostrarApenasPendentesPagamento)
+                query = query.Where(p => p.Status == StatusPedido.Pendente);
 
             Pedidos.Clear();
             foreach (var ped in query.OrderByDescending(p => p.DataVenda ?? DateTime.MinValue))
@@ -247,6 +393,13 @@ namespace WpfApp.ViewModels
         private void Editar()
         {
             if (PedidoSelecionado == null) return;
+
+            // Bloquear edição de pedidos finalizados
+            if (PedidoSelecionado.IsFinalizado)
+            {
+                MessageBox.Show("Pedido finalizado não pode ser editado.");
+                return;
+            }
 
             EditBuffer = new Pedido
             {
@@ -281,6 +434,13 @@ namespace WpfApp.ViewModels
         {
             try
             {
+                // Bloquear salvar alterações se o pedido já foi finalizado
+                if (EditBuffer.IsFinalizado)
+                {
+                    MessageBox.Show("Pedido finalizado não pode ser alterado.");
+                    return;
+                }
+
                 EditBuffer.Itens = ItensEdit.ToList();
 
                 if (EditBuffer.Id == 0 && !EditBuffer.DataVenda.HasValue)
@@ -317,6 +477,8 @@ namespace WpfApp.ViewModels
                 }
 
                 IsEditando = false;
+                IsModalPedidoVisible = false;
+                ItensEdit.Clear();
             }
             catch (Exception ex)
             {
@@ -339,8 +501,8 @@ namespace WpfApp.ViewModels
         }
 
         // Itens
-        private PedidoItem _itemSelecionado;
-        public PedidoItem ItemSelecionado
+        private PedidoItem? _itemSelecionado;
+        public PedidoItem? ItemSelecionado
         {
             get => _itemSelecionado;
             set
@@ -374,6 +536,8 @@ namespace WpfApp.ViewModels
 
             RecalcularTotal();
             QtdeParaAdicionar = 1;
+            SalvarCommand.RaiseCanExecuteChanged();
+            FinalizarCommand.RaiseCanExecuteChanged();
         }
 
         private void RemoverItem()
@@ -381,6 +545,8 @@ namespace WpfApp.ViewModels
             if (ItemSelecionado == null) return;
             ItensEdit.Remove(ItemSelecionado);
             RecalcularTotal();
+            SalvarCommand.RaiseCanExecuteChanged();
+            FinalizarCommand.RaiseCanExecuteChanged();
         }
 
         private void Finalizar()
@@ -394,8 +560,7 @@ namespace WpfApp.ViewModels
 
                 RecalcularTotal();
 
-                if (EditBuffer.Status == StatusPedido.Pendente)
-                    EditBuffer.Status = StatusPedido.Pago;
+                // Manter status Pendente por padrão ao finalizar; sem mudança automática para Pago
 
                 EditBuffer.IsFinalizado = true;
 
@@ -418,6 +583,77 @@ namespace WpfApp.ViewModels
             catch (Exception ex)
             {
                 MessageBox.Show($"Erro ao finalizar: {ex.Message}");
+            }
+        }
+
+        private void FinalizarSelecionado()
+        {
+            try
+            {
+                if (PedidoSelecionado == null) return;
+                if (PedidoSelecionado.IsFinalizado)
+                {
+                    MessageBox.Show("Pedido já finalizado.");
+                    return;
+                }
+
+                if (!PedidoSelecionado.DataVenda.HasValue)
+                    PedidoSelecionado.DataVenda = DateTime.Now;
+
+                // Recalcular total baseado nos itens atuais
+                var itens = PedidoSelecionado.Itens ?? new System.Collections.Generic.List<PedidoItem>();
+                PedidoSelecionado.ValorTotal = itens.Sum(i => i.TotalItem);
+
+                // Manter status atual (padrão: Pendente) e apenas marcar como finalizado
+                PedidoSelecionado.IsFinalizado = true;
+
+                _pedidosRepo.Update(PedidoSelecionado);
+
+                var idx = Pedidos.ToList().FindIndex(p => p.Id == PedidoSelecionado.Id);
+                if (idx >= 0)
+                    Pedidos[idx] = PedidoSelecionado;
+
+                MessageBox.Show("Pedido finalizado.");
+                FinalizarSelecionadoCommand.RaiseCanExecuteChanged();
+                EditarCommand.RaiseCanExecuteChanged();
+                MarcarPagoCommand.RaiseCanExecuteChanged();
+                MarcarEnviadoCommand.RaiseCanExecuteChanged();
+                MarcarRecebidoCommand.RaiseCanExecuteChanged();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erro ao finalizar: {ex.Message}");
+            }
+        }
+
+        private void MarcarStatus(StatusPedido novoStatus)
+        {
+            try
+            {
+                if (PedidoSelecionado == null) return;
+
+                if (!PedidoSelecionado.IsFinalizado)
+                {
+                    MessageBox.Show("Finalize o pedido antes de alterar o status.");
+                    return;
+                }
+
+                if (PedidoSelecionado.Status == novoStatus) return;
+
+                PedidoSelecionado.Status = novoStatus;
+                _pedidosRepo.Update(PedidoSelecionado);
+
+                var idx = Pedidos.ToList().FindIndex(p => p.Id == PedidoSelecionado.Id);
+                if (idx >= 0)
+                    Pedidos[idx] = PedidoSelecionado;
+
+                MarcarPagoCommand.RaiseCanExecuteChanged();
+                MarcarEnviadoCommand.RaiseCanExecuteChanged();
+                MarcarRecebidoCommand.RaiseCanExecuteChanged();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erro ao atualizar status: {ex.Message}");
             }
         }
     }

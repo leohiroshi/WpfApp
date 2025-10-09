@@ -1,6 +1,7 @@
 ﻿<UserControl x:Class="WpfApp.Views.PessoasView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
     </UserControl.Resources>
@@ -68,9 +69,13 @@
                     <Button Content="Excluir" Command="{Binding ExcluirCommand}" Margin="0,0,6,0"/>
 
                     <Separator Width="12"/>
-                    <Button Content="Incluir Pedido"
-                            Command="{Binding IncluirPedidoCommand}"
-                            IsEnabled="{Binding PodeIncluirPedido}"/>
+                    <Button Command="{Binding IncluirPedidoCommand}"
+                            IsEnabled="{Binding PodeIncluirPedido}">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconMaterial Kind="CartPlus" Width="16" Height="16" Margin="0,0,6,0"/>
+                            <TextBlock Text="Incluir Pedido"/>
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </Grid>
         </GroupBox>
@@ -93,7 +98,8 @@
 
                     <TextBlock Text="Forma de Pagamento:" VerticalAlignment="Center" Margin="12,0,6,0"/>
                     <ComboBox Width="180"
-                              SelectedItem="{Binding FormaPagamentoSelecionada}">
+                              SelectedValue="{Binding FormaPagamentoSelecionada}"
+                              SelectedValuePath="Content">
                         <ComboBoxItem Content="Dinheiro"/>
                         <ComboBoxItem Content="Cartao"/>
                         <ComboBoxItem Content="Boleto"/>

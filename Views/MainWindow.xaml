@@ -1,19 +1,911 @@
 ﻿<Window x:Class="WpfApp.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:Icon="http://metro.mahapps.com/winfx/xaml/iconpacks"
         xmlns:views="clr-namespace:WpfApp.Views"
-        Title="WpfApp - Cadastros" Height="600" Width="900">
-    <Grid>
-        <TabControl>
-            <TabItem Header="Pessoas" DataContext="{Binding PessoasVM}">
-                <views:PessoasView />
-            </TabItem>
-            <TabItem Header="Produtos" DataContext="{Binding ProdutosVM}">
-                <views:ProdutosView />
-            </TabItem>
-            <TabItem Header="Pedidos" DataContext="{Binding PedidosVM}">
-                <views:PedidoView />
-            </TabItem>
-        </TabControl>
-    </Grid>
+        Height="720" Width="1080" WindowStartupLocation="CenterScreen" WindowStyle="None"
+        AllowsTransparency="True" Background="Transparent">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+
+    <Border Background="#eff2f7" CornerRadius="30" MouseDown="Border_MouseDown" MouseLeftButtonDown="Border_MouseLeftButtonDown">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="200"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Menu lateral -->
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Icone do Menu -->
+                <Button Margin="20 28 0 35" Style="{StaticResource topButton}">
+                    <Icon:PackIconMaterial Kind="Menu" Width="15" Height="15"/>
+                </Button>
+
+                <Border Grid.Row="1" Background="#623ed0" CornerRadius="0 50 0 30">
+                    <DockPanel>
+                        <!-- Menu Logo -->
+                        <StackPanel DockPanel.Dock="Top">
+                            <Button Style="{StaticResource menuButton}">
+                                <StackPanel Orientation="Horizontal">
+                                    <Icon:PackIconMaterial Kind="HomeVariant" Style="{StaticResource menuButtonIcon}"/>
+                                    <TextBlock Text="Home"/>
+                                </StackPanel>
+                            </Button>
+
+                            <Button Style="{StaticResource menuButton}" Click="MenuPessoas_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <Icon:PackIconMaterial Kind="AccountCircle" Style="{StaticResource menuButtonIcon}"/>
+                                    <TextBlock Text="Pessoas"/>
+                                </StackPanel>
+                            </Button>
+
+                            <Button Style="{StaticResource menuButton}" Click="MenuProdutos_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <Icon:PackIconMaterial Kind="PackageVariant" Style="{StaticResource menuButtonIcon}"/>
+                                    <TextBlock Text="Produtos"/>
+                                </StackPanel>
+                            </Button>
+
+                            <Button Style="{StaticResource menuButton}" Click="MenuPedidos_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <Icon:PackIconMaterial Kind="InvoiceText" Style="{StaticResource menuButtonIcon}"/>
+                                    <TextBlock Text="Pedidos"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+            </Grid>
+
+            <!-- Main Section -->
+            <Grid Grid.Column="1" Margin="30 20 20 20">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="auto"/>
+                    <RowDefinition Height="auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Header comum -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="auto"/>
+                        <ColumnDefinition Width="auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Page Title -->
+                    <TextBlock x:Name="pageTitle" Text="Pessoas" Grid.Column="0" FontSize="32" FontWeight="SemiBold" 
+                               HorizontalAlignment="Left" VerticalAlignment="Center" Foreground="#121518"/>
+
+                    <!-- Top Buttons -->
+                    <Button Style="{StaticResource topButton}" Grid.Column="1" 
+                            Background="#ff4444" Click="BtnFecharApp_Click"
+                            ToolTip="Fechar Aplicação">
+                        <Icon:PackIconMaterial Kind="Close" Foreground="White"/>
+                    </Button>
+                </Grid>
+
+                <Separator Height="1" Grid.Row="1" Background="#dae2ea" Margin="0 20 0 10"/>
+
+                <!-- Conteúdo das seções -->
+                <Grid Grid.Row="2">
+                    <!-- Seção Pessoas -->
+                    <Grid x:Name="pessoasSection" DataContext="{Binding PessoasViewModel}">
+                        <!-- Conteúdo da seção Pessoas aqui -->
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="auto"/>
+                            <RowDefinition Height="auto"/>
+                            <RowDefinition Height="auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="auto"/>
+                            <RowDefinition Height="auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Filtros e botão adicionar -->
+                        <Grid Grid.Row="0" Margin="0 0 0 20" VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="300"/>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Search Textbox por nome -->
+                            <Grid Grid.Column="0" VerticalAlignment="Center">
+                                <TextBlock Margin="20 0" VerticalAlignment="Center" Foreground="#b0b9c6" IsHitTestVisible="False"
+                                           Panel.ZIndex="1" Text="Procurar por nome..."
+                                           Visibility="{Binding ElementName=txtSearchNome,Path=Text.IsEmpty,Converter={StaticResource BoolToVis}}"/>
+
+                                <TextBox x:Name="txtSearchNome" 
+                                         Style="{StaticResource textBoxSearch}"
+                                         Text="{Binding FiltroNome, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <Icon:PackIconMaterial Kind="Magnify" Width="15" Height="15" VerticalAlignment="Center"
+                                                       Margin="0 0 15 0" Foreground="#b0b9c6" HorizontalAlignment="Right"/>
+                            </Grid>
+
+                            <!-- Filter Textbox para CPF -->
+                            <Grid Grid.Column="1" Margin="10 0 0 0" VerticalAlignment="Center">
+                                <TextBlock Margin="15 0" VerticalAlignment="Center" Foreground="#b0b9c6" IsHitTestVisible="False"
+                                           Panel.ZIndex="1" Text="Filtrar por CPF..."
+                                           Visibility="{Binding ElementName=txtFilterCpf,Path=Text.IsEmpty,Converter={StaticResource BoolToVis}}"/>
+
+                                <TextBox x:Name="txtFilterCpf" 
+                                         Style="{StaticResource textBoxFilter}"
+                                         Text="{Binding FiltroCpf, UpdateSourceTrigger=PropertyChanged}"/>
+                            </Grid>
+
+                            <!-- Botão de busca -->
+                            <Button Grid.Column="2" Style="{StaticResource topButton}"
+                                    Command="{Binding BuscarCommand}"
+                                    HorizontalAlignment="Left" VerticalAlignment="Center"
+                                    Margin="20 0 0 0" ToolTip="Aplicar filtro">
+                                <Icon:PackIconMaterial Kind="Magnify" Width="15" Height="15"/>
+                            </Button>
+
+                            <!-- Ações: Adicionar Pessoa e Incluir Pedido -->
+                                <StackPanel Grid.Column="3" Orientation="Vertical" HorizontalAlignment="Right">
+                                <Button Style="{StaticResource addButton}"
+                                        Command="{Binding AbrirModalAddPessoaCommand}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Icon:PackIconMaterial Kind="Plus" VerticalAlignment="Center" Width="11" Height="11" Margin="0 1 5 0"/>
+                                        <TextBlock Text="Adicionar Pessoa"/>
+                                    </StackPanel>
+                                </Button>
+                                    <Button Style="{StaticResource addButton}" Margin="0 10 0 0"
+                                        Click="BtnIncluirPedidoPessoas_Click"
+                                        IsEnabled="{Binding PodeIncluirPedido}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Icon:PackIconMaterial Kind="CartPlus" VerticalAlignment="Center" Width="11" Height="11" Margin="0 1 5 0"/>
+                                        <TextBlock Text="Incluir Pedido"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+
+                        </Grid>
+
+                        <!-- Counter -->
+                        <TextBlock Grid.Row="1" FontSize="18" FontWeight="SemiBold" Margin="0 10 0 10"
+                                   Foreground="#121518" HorizontalAlignment="Left" VerticalAlignment="Center">
+                            <TextBlock.Text>
+                                <MultiBinding StringFormat="{}{0} Pessoas">
+                                    <Binding Path="Pessoas.Count"/>
+                                </MultiBinding>
+                            </TextBlock.Text>
+                        </TextBlock>
+
+                        <!-- Inclusão de Pedido (inline) -->
+                        <Border Grid.Row="2" Margin="0 10 0 10" Padding="15" Background="#ffffff" CornerRadius="8"
+                                Visibility="{Binding IsIncluindoPedido, Converter={StaticResource BoolToVis}}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Cabeçalho: Pessoa, Forma de Pagamento, Total -->
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Pessoa:" VerticalAlignment="Center"/>
+                                    <TextBlock Margin="6,0,12,0" VerticalAlignment="Center" FontWeight="Bold"
+                                               Text="{Binding PessoaSelecionada.Nome}"/>
+
+                                    <TextBlock Text="Forma de Pagamento:" VerticalAlignment="Center" Margin="12,0,6,0"/>
+                                    <ComboBox Width="180" SelectedValue="{Binding FormaPagamentoSelecionada}" SelectedValuePath="Content">
+                                        <ComboBoxItem Content="Dinheiro"/>
+                                        <ComboBoxItem Content="Cartao"/>
+                                        <ComboBoxItem Content="Boleto"/>
+                                    </ComboBox>
+
+                                    <TextBlock Text="Total:" VerticalAlignment="Center" Margin="12,0,6,0"/>
+                                    <TextBlock FontWeight="Bold">
+                                        <TextBlock.Text>
+                                            <Binding Path="TotalPedidoEmEdicao" StringFormat="{}{0:C2}"/>
+                                        </TextBlock.Text>
+                                    </TextBlock>
+                                </StackPanel>
+
+                                <!-- Produtos e Itens -->
+                                <Grid Grid.Row="1" Margin="0,8,0,8">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                        <TextBlock Text="Produto:" VerticalAlignment="Center"/>
+                                        <ComboBox Width="280" Margin="6,0,12,0"
+                                                  ItemsSource="{Binding Produtos}"
+                                                  DisplayMemberPath="Nome"
+                                                  SelectedItem="{Binding ProdutoSelecionadoParaAdicionar}"/>
+
+                                        <TextBlock Text="Qtde:" VerticalAlignment="Center"/>
+                                        <TextBox Width="80" Margin="6,0,12,0"
+                                                 Text="{Binding QtdeParaAdicionar, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                        <Button Content="Adicionar" Command="{Binding AdicionarItemPedidoCommand}"/>
+                                        <Button Content="Remover" Command="{Binding RemoverItemPedidoCommand}" Margin="6,0,0,0"/>
+                                    </StackPanel>
+
+                                    <DataGrid Grid.Row="1" ItemsSource="{Binding ItensPedidoEmEdicao}"
+                                              SelectedItem="{Binding ItemSelecionadoEmEdicao}"
+                                              AutoGenerateColumns="False" IsReadOnly="True"
+                                              Style="{DynamicResource DataGridStyle1}"
+                                              CellStyle="{DynamicResource DataGridCellStyle1}"
+                                              ColumnHeaderStyle="{DynamicResource DataGridColumnHeaderStyle1}"
+                                              RowStyle="{DynamicResource DataGridRowStyle1}">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Produto" Binding="{Binding ProdutoNome}" Width="2*"/>
+                                            <DataGridTextColumn Header="Quantidade" Binding="{Binding Quantidade}" Width="120"/>
+                                            <DataGridTextColumn Header="Valor Unit." Width="140">
+                                                <DataGridTextColumn.Binding>
+                                                    <Binding Path="ValorUnitario" StringFormat="{}{0:C2}" />
+                                                </DataGridTextColumn.Binding>
+                                            </DataGridTextColumn>
+                                            <DataGridTextColumn Header="Subtotal" Width="140">
+                                                <DataGridTextColumn.Binding>
+                                                    <Binding Path="TotalItem" StringFormat="{}{0:C2}" />
+                                                </DataGridTextColumn.Binding>
+                                            </DataGridTextColumn>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </Grid>
+
+                                <!-- Ações -->
+                                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button Command="{Binding FinalizarPedidoCommand}" Style="{StaticResource addButton}" Margin="0,0,6,0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Icon:PackIconMaterial Kind="CheckCircle" VerticalAlignment="Center" Width="11" Height="11" Margin="0 0 5 0"/>
+                                            <TextBlock Text="Finalizar Pedido"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Content="Cancelar" Command="{Binding CancelarInclusaoPedidoCommand}" Style="{StaticResource topButton}" Background="#dcdcdc" Foreground="#6e7783"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Grid de Pessoas -->
+                        <DataGrid Grid.Row="3" Style="{DynamicResource DataGridStyle1}" 
+                                  CellStyle="{DynamicResource DataGridCellStyle1}" 
+                                  ColumnHeaderStyle="{DynamicResource DataGridColumnHeaderStyle1}" 
+                                  RowStyle="{DynamicResource DataGridRowStyle1}" 
+                                  x:Name="pessoasDataGrid"
+                                  ItemsSource="{Binding Pessoas}"
+                                  SelectedItem="{Binding PessoaSelecionada}"
+                                  AutoGenerateColumns="False">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="ID" Binding="{Binding Id}" IsReadOnly="True" Width="60" />
+
+                                <DataGridTemplateColumn Header="Pessoa" IsReadOnly="True" Width="*">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Border Width="25" Height="25" CornerRadius="50" Margin="0 0 10 0" Background="#7950f2">
+                                                    <TextBlock Text="{Binding Iniciais}" 
+                                                               VerticalAlignment="Center" 
+                                                               HorizontalAlignment="Center" 
+                                                               Foreground="White" 
+                                                               Margin="0 0 0 1"/>
+                                                </Border>
+                                                <TextBlock Text="{Binding Nome}" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <DataGridTextColumn Header="CPF" Binding="{Binding Cpf}" IsReadOnly="True" Width="*" />
+                                <DataGridTextColumn Header="Endereço" Binding="{Binding Endereco}" IsReadOnly="True" Width="*" />
+
+                                <DataGridTemplateColumn Header="Operações" IsReadOnly="True" Width="auto">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Button Style="{StaticResource gridEditButton}"
+                                                        Command="{Binding DataContext.EditarCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                        CommandParameter="{Binding}">
+                                                    <Icon:PackIconMaterial Kind="PencilOutline" Style="{StaticResource gridButtonIcon}"/>
+                                                </Button>
+                                                <Button Style="{StaticResource gridRemoveButton}"
+                                                        Command="{Binding DataContext.ExcluirCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                        CommandParameter="{Binding}">
+                                                    <Icon:PackIconMaterial Kind="DeleteOutline" Style="{StaticResource gridButtonIcon}"/>
+                                                </Button>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+
+                        <!-- Paginação -->
+                        <Border Grid.Row="5" HorizontalAlignment="Right" BorderBrush="#dee4ec" BorderThickness="1"
+                                CornerRadius="5" Margin="0 20 0 0">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Style="{StaticResource pagingButton}">
+                                    <Icon:PackIconMaterial Kind="ChevronLeft" Style="{StaticResource pagingButtonIcon}"/>
+                                </Button>
+                                <Rectangle Width="1" Fill="#dee4ec" Margin="3 7" />
+                                <Button Style="{StaticResource pagingButton}" Content="1"/>
+                                <Button Style="{StaticResource pagingButton}" Content="2" Background="#7950f2" Foreground="#fff"/>
+                                <Button Style="{StaticResource pagingButton}" Content="3"/>
+                                <TextBlock Text="..." Foreground="#6c7682" VerticalAlignment="Center" FontSize="15" Margin="10 0"/>
+                                <Button Style="{StaticResource pagingButton}" Content="7"/>
+                                <Button Style="{StaticResource pagingButton}" Content="8"/>
+                                <Button Style="{StaticResource pagingButton}" Content="9"/>
+                                <Rectangle Width="1" Fill="#dee4ec" Margin="3 7" />
+                                <Button Style="{StaticResource pagingButton}">
+                                    <Icon:PackIconMaterial Kind="ChevronRight" Style="{StaticResource pagingButtonIcon}"/>
+                                </Button>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- Seção Produtos -->
+                    <Grid x:Name="produtosSection" DataContext="{Binding ProdutosViewModel}" Visibility="Collapsed">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="auto"/>
+                            <RowDefinition Height="auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Filtros Produtos -->
+                        <Grid Grid.Row="0" Margin="0 0 0 20">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Nome -->
+                            <Grid Grid.Column="0">
+                                <TextBlock Margin="15 0" VerticalAlignment="Center" Foreground="#b0b9c6" IsHitTestVisible="False"
+                                           Panel.ZIndex="1" Text="Nome..."
+                                           Visibility="{Binding ElementName=txtFiltroNomeProduto,Path=Text.IsEmpty,Converter={StaticResource BoolToVis}}"/>
+                                <TextBox x:Name="txtFiltroNomeProduto" Style="{StaticResource textBoxFilter}"
+                                         Text="{Binding FiltroNome, UpdateSourceTrigger=PropertyChanged}"/>
+                            </Grid>
+
+                            <!-- Código -->
+                            <Grid Grid.Column="1" Margin="10 0 0 0">
+                                <TextBlock Margin="15 0" VerticalAlignment="Center" Foreground="#b0b9c6" IsHitTestVisible="False"
+                                           Panel.ZIndex="1" Text="Código..."
+                                           Visibility="{Binding ElementName=txtFiltroCodigoProduto,Path=Text.IsEmpty,Converter={StaticResource BoolToVis}}"/>
+                                <TextBox x:Name="txtFiltroCodigoProduto" Style="{StaticResource textBoxFilter}"
+                                         Text="{Binding FiltroCodigo, UpdateSourceTrigger=PropertyChanged}"/>
+                            </Grid>
+
+                            <!-- Valor Min -->
+                            <Grid Grid.Column="2" Margin="10 0 0 0">
+                                <TextBlock Margin="15 0" VerticalAlignment="Center" Foreground="#b0b9c6" IsHitTestVisible="False"
+                                           Panel.ZIndex="1" Text="Valor mín."
+                                           Visibility="{Binding ElementName=txtFiltroValorMinProduto,Path=Text.IsEmpty,Converter={StaticResource BoolToVis}}"/>
+                                <TextBox x:Name="txtFiltroValorMinProduto" Style="{StaticResource textBoxFilter}"
+                                         Text="{Binding FiltroValorMin, UpdateSourceTrigger=PropertyChanged}"/>
+                            </Grid>
+
+                            <!-- Valor Max -->
+                            <Grid Grid.Column="3" Margin="10 0 0 0">
+                                <TextBlock Margin="15 0" VerticalAlignment="Center" Foreground="#b0b9c6" IsHitTestVisible="False"
+                                           Panel.ZIndex="1" Text="Valor máx."
+                                           Visibility="{Binding ElementName=txtFiltroValorMaxProduto,Path=Text.IsEmpty,Converter={StaticResource BoolToVis}}"/>
+                                <TextBox x:Name="txtFiltroValorMaxProduto" Style="{StaticResource textBoxFilter}"
+                                         Text="{Binding FiltroValorMax, UpdateSourceTrigger=PropertyChanged}"/>
+                            </Grid>
+
+                            <!-- Botão Buscar (ícone de lupa) -->
+                            <Button Grid.Column="4" Style="{StaticResource topButton}"
+                                    Command="{Binding BuscarCommand}" Margin="20 0 0 0"
+                                    ToolTip="Aplicar filtro" VerticalAlignment="Center">
+                                <Icon:PackIconMaterial Kind="Magnify" Width="15" Height="15"/>
+                            </Button>
+
+                            <!-- Add Button -->
+                            <Button Grid.Column="5" Style="{StaticResource addButton}" Command="{Binding AbrirModalAddProdutoCommand}">
+                                <StackPanel Orientation="Horizontal">
+                                    <Icon:PackIconMaterial Kind="Plus" VerticalAlignment="Center" Width="11" Height="11" Margin="0 1 5 0"/>
+                                    <TextBlock Text="Adicionar Produto"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                        <!-- Counter Produtos -->
+                        <TextBlock Grid.Row="1" FontSize="18" FontWeight="SemiBold" Margin="0 10 0 10"
+                                   Foreground="#121518" HorizontalAlignment="Left">
+                            <TextBlock.Text>
+                                <MultiBinding StringFormat="{}{0} Produtos">
+                                    <Binding Path="Produtos.Count"/>
+                                </MultiBinding>
+                            </TextBlock.Text>
+                        </TextBlock>
+
+                        <!-- Grid Produtos -->
+                        <DataGrid Grid.Row="2" Style="{DynamicResource DataGridStyle1}" 
+                                  CellStyle="{DynamicResource DataGridCellStyle1}" 
+                                  ColumnHeaderStyle="{DynamicResource DataGridColumnHeaderStyle1}" 
+                                  RowStyle="{DynamicResource DataGridRowStyle1}" 
+                                  ItemsSource="{Binding Produtos}"
+                                  SelectedItem="{Binding ProdutoSelecionado}"
+                                  AutoGenerateColumns="False">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="ID" Binding="{Binding Id}" IsReadOnly="True" Width="60" />
+                                <DataGridTextColumn Header="Nome" Binding="{Binding Nome}" IsReadOnly="True" Width="*" />
+                                <DataGridTextColumn Header="Código" Binding="{Binding Codigo}" IsReadOnly="True" Width="*" />
+                                <DataGridTextColumn Header="Valor" Binding="{Binding Valor, StringFormat=C}" IsReadOnly="True" Width="*" />
+
+                                <DataGridTemplateColumn Header="Operações" IsReadOnly="True" Width="auto">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Button Style="{StaticResource gridEditButton}"
+                                                        Command="{Binding DataContext.EditarCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}">
+                                                    <Icon:PackIconMaterial Kind="PencilOutline" Style="{StaticResource gridButtonIcon}"/>
+                                                </Button>
+                                                <Button Style="{StaticResource gridRemoveButton}"
+                                                        Command="{Binding DataContext.ExcluirCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}">
+                                                    <Icon:PackIconMaterial Kind="DeleteOutline" Style="{StaticResource gridButtonIcon}"/>
+                                                </Button>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+
+                    <!-- Seção Pedidos -->
+                    <Grid x:Name="pedidosSection" DataContext="{Binding PedidosViewModel}" Visibility="Collapsed">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="auto"/>
+                            <RowDefinition Height="auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Header Pedidos -->
+                        <Grid Grid.Row="0" Margin="0 0 0 20">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="auto"/>
+                                <ColumnDefinition Width="auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ComboBox Grid.Column="0" Width="300" HorizontalAlignment="Left" Margin="0,0,10,0"
+                                      Background="Transparent" BorderThickness="0" Padding="4" Height="35" VerticalAlignment="Center"
+                                      ItemsSource="{Binding Pessoas}" 
+                                      SelectedItem="{Binding PessoaSelecionada}"
+                                      DisplayMemberPath="Nome"/>
+
+                            <!-- Limpar filtros -->
+                            <Button Grid.Column="1" Style="{StaticResource topButton}" Command="{Binding LimparFiltrosCommand}" Margin="0,0,10,0" VerticalAlignment="Center"
+                                    ToolTip="Limpar filtros">
+                                <Icon:PackIconMaterial Kind="Broom" Width="15" Height="15"/>
+                            </Button>
+
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <!-- Filtros adicionais -->
+                                <CheckBox Content="Apenas entregues"
+                                          IsChecked="{Binding MostrarApenasEntregues}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <CheckBox Content="Apenas pagos"
+                                          IsChecked="{Binding MostrarApenasPagos}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <CheckBox Content="Pendentes de pagamento"
+                                          IsChecked="{Binding MostrarApenasPendentesPagamento}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+
+                                <Button Style="{StaticResource addButton}" Command="{Binding AbrirModalPedidoCommand}" Margin="0,0,10,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Icon:PackIconMaterial Kind="Plus" VerticalAlignment="Center" Width="11" Height="11" Margin="0 1 5 0"/>
+                                        <TextBlock Text="Novo Pedido"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource addButton}" Command="{Binding FinalizarSelecionadoCommand}" Margin="0,0,8,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Icon:PackIconMaterial Kind="CheckBold" VerticalAlignment="Center" Width="11" Height="11" Margin="0 1 5 0"/>
+                                        <TextBlock Text="Finalizar Selecionado"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource topButton}" Command="{Binding MarcarPagoCommand}" ToolTip="Marcar como Pago" Margin="0,0,8,0">
+                                    <Icon:PackIconMaterial Kind="CashCheck" Width="15" Height="15"/>
+                                </Button>
+                                <Button Style="{StaticResource topButton}" Command="{Binding MarcarEnviadoCommand}" ToolTip="Marcar como Enviado" Margin="0,0,8,0">
+                                    <Icon:PackIconMaterial Kind="TruckDelivery" Width="15" Height="15"/>
+                                </Button>
+                                <Button Style="{StaticResource topButton}" Command="{Binding MarcarRecebidoCommand}" ToolTip="Marcar como Recebido">
+                                    <Icon:PackIconMaterial Kind="PackageVariantClosedCheck" Width="15" Height="15"/>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Counter Pedidos -->
+                        <TextBlock Grid.Row="1" FontSize="18" FontWeight="SemiBold" Margin="0 10 0 10"
+                                   Foreground="#121518" HorizontalAlignment="Left">
+                            <TextBlock.Text>
+                                <MultiBinding StringFormat="{}{0} Pedidos">
+                                    <Binding Path="Pedidos.Count"/>
+                                </MultiBinding>
+                            </TextBlock.Text>
+                        </TextBlock>
+
+                        <!-- Grid Pedidos -->
+                        <DataGrid Grid.Row="2" Style="{DynamicResource DataGridStyle1}" 
+                                  CellStyle="{DynamicResource DataGridCellStyle1}" 
+                                  ColumnHeaderStyle="{DynamicResource DataGridColumnHeaderStyle1}" 
+                                  RowStyle="{DynamicResource DataGridRowStyle1}" 
+                                  ItemsSource="{Binding Pedidos}"
+                                  SelectedItem="{Binding PedidoSelecionado}"
+                                  AutoGenerateColumns="False">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="ID" Binding="{Binding Id}" IsReadOnly="True" Width="60" />
+                                <DataGridTextColumn Header="Pessoa" Binding="{Binding PessoaNome}" IsReadOnly="True" Width="*" />
+                                <DataGridTextColumn Header="Data" Binding="{Binding DataVenda, StringFormat=dd/MM/yyyy}" IsReadOnly="True" Width="*" />
+                                <DataGridTextColumn Header="Valor Total" Binding="{Binding ValorTotal, StringFormat=C}" IsReadOnly="True" Width="*" />
+                                <DataGridTextColumn Header="Status" Binding="{Binding Status}" IsReadOnly="True" Width="*" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </Grid>
+            </Grid>
+            <!-- Modal de Pedido -->
+            <Border x:Name="modalPedido" Grid.ColumnSpan="2" Background="#80000000"
+                    Visibility="{Binding PedidosViewModel.IsModalPedidoVisible, Converter={StaticResource BoolToVis}, TargetNullValue=Collapsed, FallbackValue=Collapsed}"
+                    Panel.ZIndex="1000">
+                <Border Background="#eff2f7" CornerRadius="20" Width="700"
+                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Grid Margin="30">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="auto"/>
+                            <RowDefinition Height="auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="auto"/>
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0" Margin="0 0 0 20">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Novo Pedido" FontSize="24" FontWeight="SemiBold"
+                                       Foreground="#121518" VerticalAlignment="Center"/>
+                            <Button Grid.Column="1" Style="{StaticResource topButton}"
+                                    Command="{Binding PedidosViewModel.FecharModalPedidoCommand}" Background="Transparent">
+                                <Icon:PackIconMaterial Kind="Close" Width="15" Height="15" Foreground="#6e7783"/>
+                            </Button>
+                        </Grid>
+
+                        <Separator Height="1" Grid.Row="1" Background="#dae2ea" Margin="0 0 0 20"/>
+
+                        <Grid Grid.Row="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Pessoa e forma de pagamento -->
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Pessoa:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <ComboBox Width="280" ItemsSource="{Binding PedidosViewModel.Pessoas}"
+                                          SelectedItem="{Binding PedidosViewModel.PessoaSelecionadaEdicao}"
+                                          DisplayMemberPath="Nome"/>
+
+                                <TextBlock Text="Forma de Pagamento:" VerticalAlignment="Center" Margin="12,0,6,0"/>
+                                <ComboBox Width="180"
+                                          ItemsSource="{Binding PedidosViewModel.FormaPagamentoValues}"
+                                          SelectedItem="{Binding PedidosViewModel.EditBuffer.FormaPagamento}"/>
+                            </StackPanel>
+
+                            <!-- Adição de itens -->
+                            <StackPanel Orientation="Horizontal" Grid.Row="1" Margin="0,10,0,10">
+                                <TextBlock Text="Produto:" VerticalAlignment="Center"/>
+                                <ComboBox Width="300" Margin="6,0,12,0"
+                                          ItemsSource="{Binding PedidosViewModel.Produtos}"
+                                          DisplayMemberPath="Nome"
+                                          SelectedItem="{Binding PedidosViewModel.ProdutoSelecionadoParaAdicionar}"/>
+
+                                <TextBlock Text="Qtde:" VerticalAlignment="Center"/>
+                                <TextBox Width="80" Margin="6,0,12,0"
+                                         Text="{Binding PedidosViewModel.QtdeParaAdicionar, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <Button Content="Adicionar" Command="{Binding PedidosViewModel.AdicionarItemCommand}" />
+                            </StackPanel>
+
+                            <!-- Itens -->
+                            <DataGrid Grid.Row="2" ItemsSource="{Binding PedidosViewModel.ItensEdit}" AutoGenerateColumns="False" IsReadOnly="True">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Produto" Binding="{Binding ProdutoNome}" Width="2*"/>
+                                    <DataGridTextColumn Header="Quantidade" Binding="{Binding Quantidade}" Width="120"/>
+                                    <DataGridTextColumn Header="Valor Unit." Binding="{Binding ValorUnitario, StringFormat=\{0:C2\}}" Width="140"/>
+                                    <DataGridTextColumn Header="Subtotal" Binding="{Binding TotalItem, StringFormat=\{0:C2\}}" Width="140"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+
+                        <Grid Grid.Row="3" Margin="0 20 0 0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="auto"/>
+                                <ColumnDefinition Width="auto"/>
+                            </Grid.ColumnDefinitions>                            
+
+                            <Button Grid.Column="2" Width="140" Height="35"
+                                    Style="{StaticResource addButton}" Command="{Binding PedidosViewModel.SalvarCommand}">
+                                <StackPanel Orientation="Horizontal">
+                                    <Icon:PackIconMaterial Kind="CheckCircle" VerticalAlignment="Center" Width="11" Height="11" Margin="0 0 5 0"/>
+                                    <TextBlock Text="Criar Pedido"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Border>
+            <!-- Modal de Adicionar/Editar Pessoa -->
+            <Border x:Name="modalAddPessoa" Grid.ColumnSpan="2" Background="#80000000" 
+Visibility="{Binding PessoasViewModel.IsModalAddPessoaVisible, Converter={StaticResource BoolToVis}, TargetNullValue=Collapsed, FallbackValue=Collapsed}" 
+Panel.ZIndex="1000">
+                <Border Background="#eff2f7" CornerRadius="20" Width="500" Height="400" 
+    HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Grid Margin="30">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="auto"/>
+                            <RowDefinition Height="auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Header -->
+                        <Grid Grid.Row="0" Margin="0 0 0 20">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Text="Adicionar Pessoa" FontSize="24" FontWeight="SemiBold" 
+                   Foreground="#121518" VerticalAlignment="Center"/>
+
+                            <!-- CORRIGIDO: Removido o DataContext incorreto -->
+                            <Button Grid.Column="1" Style="{StaticResource topButton}" 
+                Command="{Binding PessoasViewModel.FecharModalAddPessoaCommand}" Background="Transparent">
+                                <Icon:PackIconMaterial Kind="Close" Width="15" Height="15" Foreground="#6e7783"/>
+                            </Button>
+                        </Grid>
+
+                        <Separator Height="1" Grid.Row="1" Background="#dae2ea" Margin="0 0 0 20"/>
+
+                        <!-- Form Fields -->
+                        <!-- CORRIGIDO: Mantendo o DataContext apenas nos campos de entrada -->
+                        <Grid Grid.Row="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="auto"/>
+                                <RowDefinition Height="auto"/>
+                                <RowDefinition Height="auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Nome -->
+                            <Grid Grid.Row="0" Margin="0 0 0 20">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Icon:PackIconMaterial Kind="Account" Width="20" Height="20" 
+                                   Foreground="#6e7783" VerticalAlignment="Center" Margin="0 0 15 0"/>
+
+                                <Grid Grid.Column="1">
+                                    <TextBlock Text="Digite o nome completo..." Margin="15 0" VerticalAlignment="Center" 
+                           Foreground="#b0b9c6" IsHitTestVisible="False" Panel.ZIndex="1"
+                           Visibility="{Binding ElementName=txtNomePessoa,Path=Text.IsEmpty,Converter={StaticResource BoolToVis}}"/>
+
+                                    <TextBox x:Name="txtNomePessoa" Style="{StaticResource textBoxSearch}"
+                         Text="{Binding PessoasViewModel.EditBuffer.Nome, UpdateSourceTrigger=PropertyChanged}"/>
+                                </Grid>
+                            </Grid>
+
+                            <!-- CPF -->
+                            <Grid Grid.Row="1" Margin="0 0 0 20">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Icon:PackIconMaterial Kind="CardAccountDetails" Width="20" Height="20" 
+                                   Foreground="#6e7783" VerticalAlignment="Center" Margin="0 0 15 0"/>
+
+                                <Grid Grid.Column="1">
+                                    <TextBlock Text="000.000.000-00" Margin="15 0" VerticalAlignment="Center" 
+                           Foreground="#b0b9c6" IsHitTestVisible="False" Panel.ZIndex="1"
+                           Visibility="{Binding ElementName=txtCpfPessoa,Path=Text.IsEmpty,Converter={StaticResource BoolToVis}}"/>
+
+                                    <TextBox x:Name="txtCpfPessoa" Style="{StaticResource textBoxSearch}"
+                         Text="{Binding PessoasViewModel.EditBuffer.Cpf, UpdateSourceTrigger=PropertyChanged}"/>
+                                </Grid>
+                            </Grid>
+
+                            <!-- Endereço -->
+                            <Grid Grid.Row="2" Margin="0 0 0 20">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Icon:PackIconMaterial Kind="MapMarker" Width="20" Height="20" 
+                                   Foreground="#6e7783" VerticalAlignment="Center" Margin="0 0 15 0"/>
+
+                                <Grid Grid.Column="1">
+                                    <TextBlock Text="Endereço completo (opcional)..." Margin="15 0" VerticalAlignment="Center" 
+                           Foreground="#b0b9c6" IsHitTestVisible="False" Panel.ZIndex="1"
+                           Visibility="{Binding ElementName=txtEnderecoPessoa,Path=Text.IsEmpty,Converter={StaticResource BoolToVis}}"/>
+
+                                    <TextBox x:Name="txtEnderecoPessoa" Style="{StaticResource textBoxSearch}"
+                         Text="{Binding PessoasViewModel.EditBuffer.Endereco, UpdateSourceTrigger=PropertyChanged}"/>
+                                </Grid>
+                            </Grid>
+
+                            <!-- Validation Messages (Opcional - pode ser adicionado depois) -->
+                            <Border Grid.Row="3" Background="#ffebee" CornerRadius="8" Padding="15" 
+                Margin="0 20 0 0" x:Name="validationPanel" Visibility="Collapsed">
+                                <StackPanel>
+                                    <TextBlock x:Name="validationMessage" Foreground="#c62828" FontSize="12"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- Buttons -->
+                        <!-- CORRIGIDO: Removido o DataContext incorreto dos botões -->
+                        <Grid Grid.Row="3" Margin="0 20 0 0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="auto"/>
+                                <ColumnDefinition Width="auto"/>
+                            </Grid.ColumnDefinitions>
+
+
+                            <Button Grid.Column="2" Width="120" Height="35" 
+                Style="{StaticResource addButton}" Command="{Binding PessoasViewModel.SalvarPessoaModalCommand}">
+                                <StackPanel Orientation="Horizontal">
+                                    <Icon:PackIconMaterial Kind="ContentSave" VerticalAlignment="Center" Width="11" Height="11" Margin="0 0 5 0"/>
+                                    <TextBlock Text="Salvar"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Border>
+
+            <!-- Modal de Adicionar Produto -->
+            <Border x:Name="modalAddProduto" Grid.ColumnSpan="2" Background="#80000000"
+Visibility="{Binding ProdutosViewModel.IsModalAddProdutoVisible, Converter={StaticResource BoolToVis}, TargetNullValue=Collapsed, FallbackValue=Collapsed}"
+Panel.ZIndex="1000">
+        <Border Background="#eff2f7" CornerRadius="20" Width="500"
+        HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Grid Margin="30">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="auto"/>
+                            <RowDefinition Height="auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="auto"/>
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0" Margin="0 0 0 20">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Text="Adicionar Produto" FontSize="24" FontWeight="SemiBold"
+                       Foreground="#121518" VerticalAlignment="Center"/>
+
+                <Button Grid.Column="1" Style="{StaticResource topButton}"
+            Command="{Binding ProdutosViewModel.FecharModalAddProdutoCommand}" Background="Transparent">
+                                <Icon:PackIconMaterial Kind="Close" Width="15" Height="15" Foreground="#6e7783"/>
+                            </Button>
+                        </Grid>
+
+                        <Separator Height="1" Grid.Row="1" Background="#dae2ea" Margin="0 0 0 20"/>
+
+                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="auto"/>
+                                    <RowDefinition Height="auto"/>
+                                    <RowDefinition Height="auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <Grid Grid.Row="0" Margin="0 0 0 20">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Icon:PackIconMaterial Kind="PackageVariant" Width="20" Height="20"
+                                   Foreground="#6e7783" VerticalAlignment="Center" Margin="0 0 15 0"/>
+
+                                <Grid Grid.Column="1">
+                                    <TextBlock Text="Nome do produto..." Margin="15 0" VerticalAlignment="Center"
+                                   Foreground="#b0b9c6" IsHitTestVisible="False" Panel.ZIndex="1"
+                                   Visibility="{Binding ElementName=txtNomeProduto,Path=Text.IsEmpty,Converter={StaticResource BoolToVis}}"/>
+
+                                    <TextBox x:Name="txtNomeProduto" Style="{StaticResource textBoxSearch}"
+                         Text="{Binding ProdutosViewModel.EditBuffer.Nome, UpdateSourceTrigger=PropertyChanged}"/>
+                                </Grid>
+                                </Grid>
+
+                                <Grid Grid.Row="1" Margin="0 0 0 20">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Icon:PackIconMaterial Kind="Barcode" Width="20" Height="20"
+                                   Foreground="#6e7783" VerticalAlignment="Center" Margin="0 0 15 0"/>
+
+                                <Grid Grid.Column="1">
+                                    <TextBlock Text="Código interno..." Margin="15 0" VerticalAlignment="Center"
+                                   Foreground="#b0b9c6" IsHitTestVisible="False" Panel.ZIndex="1"
+                                   Visibility="{Binding ElementName=txtCodigoProduto,Path=Text.IsEmpty,Converter={StaticResource BoolToVis}}"/>
+
+                                    <TextBox x:Name="txtCodigoProduto" Style="{StaticResource textBoxSearch}"
+                         Text="{Binding ProdutosViewModel.EditBuffer.Codigo, UpdateSourceTrigger=PropertyChanged}"/>
+                                </Grid>
+                                </Grid>
+
+                                <Grid Grid.Row="2" Margin="0 0 0 20">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Icon:PackIconMaterial Kind="Cash" Width="20" Height="20"
+                                   Foreground="#6e7783" VerticalAlignment="Center" Margin="0 0 15 0"/>
+
+                                <Grid Grid.Column="1">
+                                    <TextBlock Text="Valor (ex: 99,90)" Margin="15 0" VerticalAlignment="Center"
+                                   Foreground="#b0b9c6" IsHitTestVisible="False" Panel.ZIndex="1"
+                                   Visibility="{Binding ElementName=txtValorProduto,Path=Text.IsEmpty,Converter={StaticResource BoolToVis}}"/>
+
+                                    <TextBox x:Name="txtValorProduto" Style="{StaticResource textBoxSearch}" Language="pt-BR"
+                                             Text="{Binding ProdutosViewModel.EditBuffer.Valor, UpdateSourceTrigger=PropertyChanged}"/>
+                                </Grid>
+                                </Grid>
+
+                                <Border Grid.Row="3" Background="#ffebee" CornerRadius="8" Padding="15"
+                                    Margin="0 20 0 0" Visibility="Collapsed">
+                                    <StackPanel>
+                                        <TextBlock Foreground="#c62828" FontSize="12"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </ScrollViewer>
+
+                        <Grid Grid.Row="3" Margin="0 20 0 0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="auto"/>
+                                <ColumnDefinition Width="auto"/>
+                            </Grid.ColumnDefinitions>
+
+                <Button Grid.Column="2" Width="140" Height="35"
+            Style="{StaticResource addButton}" Command="{Binding ProdutosViewModel.SalvarProdutoModalCommand}">
+                                <StackPanel Orientation="Horizontal">
+                                    <Icon:PackIconMaterial Kind="ContentSave" VerticalAlignment="Center" Width="11" Height="11" Margin="0 0 5 0"/>
+                                    <TextBlock Text="Salvar Produto"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Border>
+        </Grid>
+    </Border>
 </Window>

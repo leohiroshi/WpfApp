@@ -1,7 +1,11 @@
 ﻿using System;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Input;
 using WpfApp.Infra;
 using WpfApp.Models;
 using WpfApp.Services;
@@ -9,343 +13,416 @@ using WpfApp.Services.Validators;
 
 namespace WpfApp.ViewModels
 {
-    public class PessoasViewModel : BaseViewModel
+    public class PessoasViewModel : INotifyPropertyChanged
     {
-        private readonly PessoaRepository _pessoasRepo;
-        private readonly ProdutoRepository _produtosRepo;
-        private readonly PedidoRepository _pedidosRepo;
+        private readonly PessoaRepository _repository;
+        private readonly PedidoRepository _pedidoRepo;
+        private readonly ProdutoRepository _produtoRepo;
 
-        public ObservableCollection<Pessoa> Pessoas { get; } = new();
-        private Pessoa _pessoaSelecionada;
-        public Pessoa PessoaSelecionada
+        private ObservableCollection<Pessoa> _pessoas = new();
+        private Pessoa? _pessoaSelecionada;
+        private string _filtroNome = string.Empty;
+        private string _filtroCpf = string.Empty;
+        private bool _isModalAddPessoaVisible;
+        private Pessoa _editBuffer = new();
+
+        public ObservableCollection<Pessoa> Pessoas
+        {
+            get => _pessoas;
+            set { _pessoas = value; OnPropertyChanged(); }
+        }
+
+        public Pessoa? PessoaSelecionada
         {
             get => _pessoaSelecionada;
             set
             {
-                if (SetProperty(ref _pessoaSelecionada, value))
+                // Se trocar de pessoa enquanto inclui pedido, descarta o rascunho
+                if (_pessoaSelecionada != value && IsIncluindoPedido)
                 {
-                    RecarregarPedidosDaPessoa();
-                    IncluirPedidoCommand.RaiseCanExecuteChanged();
+                    CancelarInclusaoPedido();
                 }
+
+                _pessoaSelecionada = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(PodeIncluirPedido));
+                CarregarPedidosDaPessoa();
             }
         }
 
-        // Filtros Pessoa
-        private string _filtroNome = string.Empty;
         public string FiltroNome
         {
             get => _filtroNome;
-            set => SetProperty(ref _filtroNome, value);
+            set { _filtroNome = value; OnPropertyChanged(); }
         }
 
-        private string _filtroCpf = string.Empty;
         public string FiltroCpf
         {
             get => _filtroCpf;
-            set => SetProperty(ref _filtroCpf, value);
+            set { _filtroCpf = value; OnPropertyChanged(); }
         }
 
-        // Edição Pessoa
-        private Pessoa _editBuffer = new();
+        public bool IsModalAddPessoaVisible
+        {
+            get => _isModalAddPessoaVisible;
+            set { _isModalAddPessoaVisible = value; OnPropertyChanged(); }
+        }
+
         public Pessoa EditBuffer
         {
             get => _editBuffer;
-            set => SetProperty(ref _editBuffer, value);
+            set { _editBuffer = value; OnPropertyChanged(); }
         }
 
-        // Estado Pessoa
-        private bool _isEditando;
-        public bool IsEditando
-        {
-            get => _isEditando;
-            set
-            {
-                if (SetProperty(ref _isEditando, value))
-                {
-                    IncluirCommand.RaiseCanExecuteChanged();
-                    EditarCommand.RaiseCanExecuteChanged();
-                    SalvarCommand.RaiseCanExecuteChanged();
-                    ExcluirCommand.RaiseCanExecuteChanged();
-                }
-            }
-        }
+        // Comandos Pessoas
+        public ICommand CarregarCommand { get; }
+        public ICommand BuscarCommand { get; }
+        public ICommand AbrirModalAddPessoaCommand { get; }
+        public ICommand FecharModalAddPessoaCommand { get; }
+        public ICommand SalvarPessoaModalCommand { get; }
+        public ICommand EditarCommand { get; }
+        public ICommand ExcluirCommand { get; }
+        // Aliases para PessoasView.xaml (inline)
+        public ICommand IncluirCommand { get; }
+        public ICommand SalvarCommand { get; }
 
-        // Dados de Produtos (para incluir pedido)
+        // ===== Pedidos vinculados à Pessoa =====
+        public ObservableCollection<Pedido> PedidosDaPessoa { get; } = new();
         public ObservableCollection<Produto> Produtos { get; } = new();
+        public ObservableCollection<PedidoItem> ItensPedidoEmEdicao { get; } = new();
 
-        // Inclusão de Pedido (inline)
         private bool _isIncluindoPedido;
         public bool IsIncluindoPedido
         {
             get => _isIncluindoPedido;
-            set
-            {
-                if (SetProperty(ref _isIncluindoPedido, value))
-                {
-                    IncluirPedidoCommand.RaiseCanExecuteChanged();
-                    AdicionarItemPedidoCommand.RaiseCanExecuteChanged();
-                    RemoverItemPedidoCommand.RaiseCanExecuteChanged();
-                    FinalizarPedidoCommand.RaiseCanExecuteChanged();
-                    CancelarInclusaoPedidoCommand.RaiseCanExecuteChanged();
-                }
-            }
+            set { _isIncluindoPedido = value; OnPropertyChanged(); OnPropertyChanged(nameof(PodeIncluirPedido)); }
         }
 
-        public ObservableCollection<PedidoItem> ItensPedidoEmEdicao { get; } = new();
+        // Habilita o botão "Incluir Pedido" quando há pessoa selecionada e não está incluindo
+        public bool PodeIncluirPedido => PessoaSelecionada != null && !IsIncluindoPedido;
 
-        private Produto _produtoSelecionadoParaAdicionar;
-        public Produto ProdutoSelecionadoParaAdicionar
+        private Produto? _produtoSelecionadoParaAdicionar;
+        public Produto? ProdutoSelecionadoParaAdicionar
         {
             get => _produtoSelecionadoParaAdicionar;
-            set
-            {
-                if (SetProperty(ref _produtoSelecionadoParaAdicionar, value))
-                    AdicionarItemPedidoCommand.RaiseCanExecuteChanged();
-            }
+            set { _produtoSelecionadoParaAdicionar = value; OnPropertyChanged(); }
         }
 
         private int _qtdeParaAdicionar = 1;
         public int QtdeParaAdicionar
         {
             get => _qtdeParaAdicionar;
-            set
-            {
-                if (SetProperty(ref _qtdeParaAdicionar, value))
-                    AdicionarItemPedidoCommand.RaiseCanExecuteChanged();
-            }
+            set { _qtdeParaAdicionar = value; OnPropertyChanged(); }
         }
 
-        private PedidoItem _itemSelecionadoEmEdicao;
-        public PedidoItem ItemSelecionadoEmEdicao
+        private PedidoItem? _itemSelecionadoEmEdicao;
+        public PedidoItem? ItemSelecionadoEmEdicao
         {
             get => _itemSelecionadoEmEdicao;
-            set
-            {
-                if (SetProperty(ref _itemSelecionadoEmEdicao, value))
-                    RemoverItemPedidoCommand.RaiseCanExecuteChanged();
-            }
+            set { _itemSelecionadoEmEdicao = value; OnPropertyChanged(); }
         }
 
-        private FormaPagamento _formaPagamentoSelecionada = FormaPagamento.Dinheiro;
-        public FormaPagamento FormaPagamentoSelecionada
+        private string _formaPagamentoSelecionada = "Dinheiro";
+        public string FormaPagamentoSelecionada
         {
             get => _formaPagamentoSelecionada;
-            set => SetProperty(ref _formaPagamentoSelecionada, value);
+            set { _formaPagamentoSelecionada = value; OnPropertyChanged(); }
         }
 
         private decimal _totalPedidoEmEdicao;
         public decimal TotalPedidoEmEdicao
         {
             get => _totalPedidoEmEdicao;
-            private set => SetProperty(ref _totalPedidoEmEdicao, value);
+            set { _totalPedidoEmEdicao = value; OnPropertyChanged(); }
         }
 
-        // Pedidos da Pessoa
-        public ObservableCollection<Pedido> PedidosDaPessoa { get; } = new();
-
-        // Filtros rápidos de pedidos
+        // Filtros de pedidos
         private bool _mostrarApenasRecebidos;
         public bool MostrarApenasRecebidos
         {
             get => _mostrarApenasRecebidos;
-            set => SetProperty(ref _mostrarApenasRecebidos, value);
+            set { _mostrarApenasRecebidos = value; OnPropertyChanged(); }
         }
 
         private bool _mostrarApenasPagos;
         public bool MostrarApenasPagos
         {
             get => _mostrarApenasPagos;
-            set => SetProperty(ref _mostrarApenasPagos, value);
+            set { _mostrarApenasPagos = value; OnPropertyChanged(); }
         }
 
         private bool _mostrarApenasPendentes;
         public bool MostrarApenasPendentes
         {
             get => _mostrarApenasPendentes;
-            set => SetProperty(ref _mostrarApenasPendentes, value);
+            set { _mostrarApenasPendentes = value; OnPropertyChanged(); }
         }
 
-        // Comandos gerais Pessoas
-        public RelayCommand CarregarCommand { get; }
-        public RelayCommand BuscarCommand { get; }
-        public RelayCommand IncluirCommand { get; }
-        public RelayCommand EditarCommand { get; }
-        public RelayCommand SalvarCommand { get; }
-        public RelayCommand ExcluirCommand { get; }
-        public RelayCommand IncluirPessoaTesteCommand { get; }
+        // Comandos de pedidos
+        public ICommand IncluirPedidoCommand { get; }
+        public ICommand AdicionarItemPedidoCommand { get; }
+        public ICommand RemoverItemPedidoCommand { get; }
+        public ICommand FinalizarPedidoCommand { get; }
+        public ICommand CancelarInclusaoPedidoCommand { get; }
+        public ICommand MarcarPagoCommand { get; }
+        public ICommand MarcarEnviadoCommand { get; }
+        public ICommand MarcarRecebidoCommand { get; }
+        public ICommand AplicarFiltrosPedidosCommand { get; }
 
-        // Comandos de pedido inline
-        public RelayCommand IncluirPedidoCommand { get; }
-        public RelayCommand AdicionarItemPedidoCommand { get; }
-        public RelayCommand RemoverItemPedidoCommand { get; }
-        public RelayCommand FinalizarPedidoCommand { get; }
-        public RelayCommand CancelarInclusaoPedidoCommand { get; }
-
-        // Comandos por linha na grid de pedidos (não genéricos)
-        public RelayCommand MarcarPagoCommand { get; }
-        public RelayCommand MarcarEnviadoCommand { get; }
-        public RelayCommand MarcarRecebidoCommand { get; }
-
-        // Aplicar filtros rápidos
-        public RelayCommand AplicarFiltrosPedidosCommand { get; }
-
-        public PessoasViewModel(PessoaRepository pessoasRepo, ProdutoRepository produtosRepo, PedidoRepository pedidosRepo)
+        // Construtor padrão (para design-time ou standalone)
+        public PessoasViewModel()
         {
-            _pessoasRepo = pessoasRepo;
-            _produtosRepo = produtosRepo;
-            _pedidosRepo = pedidosRepo;
+            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            _repository = new PessoaRepository(Path.Combine(baseDir, "Data", "pessoas.json"));
+            _pedidoRepo = new PedidoRepository(Path.Combine(baseDir, "Data", "pedidos.json"));
+            _produtoRepo = new ProdutoRepository(Path.Combine(baseDir, "Data", "produtos.json"));
 
-            CarregarCommand = new RelayCommand(CarregarPessoas);
-            BuscarCommand = new RelayCommand(Buscar);
-            IncluirCommand = new RelayCommand(Incluir, () => !IsEditando);
-            EditarCommand = new RelayCommand(Editar, () => PessoaSelecionada != null && !IsEditando);
-            SalvarCommand = new RelayCommand(Salvar, () => IsEditando);
-            ExcluirCommand = new RelayCommand(Excluir, () => PessoaSelecionada != null && !IsEditando);
+            // Comandos Pessoas
+            CarregarCommand = new RelayCommand(_ => Carregar());
+            BuscarCommand = new RelayCommand(_ => Buscar());
+            AbrirModalAddPessoaCommand = new RelayCommand(_ => AbrirModalAddPessoa());
+            FecharModalAddPessoaCommand = new RelayCommand(_ => FecharModalAddPessoa());
+            SalvarPessoaModalCommand = new RelayCommand(_ => SalvarPessoaModal(), _ => CanSalvarPessoa());
+            EditarCommand = new RelayCommand(p => { if (p is Pessoa pes) Editar(pes); });
+            ExcluirCommand = new RelayCommand(p => { if (p is Pessoa pes) Excluir(pes); });
+            // Aliases inline
+            IncluirCommand = new RelayCommand(_ => AbrirModalAddPessoa());
+            SalvarCommand = new RelayCommand(_ => SalvarPessoaModal(), _ => CanSalvarPessoa());
 
-            // Pedidos inline
-            IncluirPedidoCommand = new RelayCommand(IniciarInclusaoPedido, () => PessoaSelecionada != null && !IsIncluindoPedido);
-            AdicionarItemPedidoCommand = new RelayCommand(AdicionarItemPedido, () => IsIncluindoPedido && ProdutoSelecionadoParaAdicionar != null && QtdeParaAdicionar > 0);
-            RemoverItemPedidoCommand = new RelayCommand(RemoverItemPedido, () => IsIncluindoPedido && ItemSelecionadoEmEdicao != null);
-            FinalizarPedidoCommand = new RelayCommand(FinalizarPedido, () => IsIncluindoPedido && ItensPedidoEmEdicao.Count > 0);
-            CancelarInclusaoPedidoCommand = new RelayCommand(CancelarInclusaoPedido, () => IsIncluindoPedido);
+            // Comandos Pedidos
+            IncluirPedidoCommand = new RelayCommand(_ => IncluirPedido());
+            AdicionarItemPedidoCommand = new RelayCommand(_ => AdicionarItemPedido());
+            RemoverItemPedidoCommand = new RelayCommand(_ => RemoverItemPedido());
+            FinalizarPedidoCommand = new RelayCommand(_ => FinalizarPedido());
+            CancelarInclusaoPedidoCommand = new RelayCommand(_ => CancelarInclusaoPedido());
+            MarcarPagoCommand = new RelayCommand(p => MarcarStatus(p, StatusPedido.Pago));
+            MarcarEnviadoCommand = new RelayCommand(p => MarcarStatus(p, StatusPedido.Enviado));
+            MarcarRecebidoCommand = new RelayCommand(p => MarcarStatus(p, StatusPedido.Recebido));
+            AplicarFiltrosPedidosCommand = new RelayCommand(_ => AplicarFiltrosPedidos());
 
-            // Ações por linha (usando RelayCommand não genérico com parâmetro object)
-            MarcarPagoCommand = new RelayCommand(
-                param => MarcarPago(param as Pedido),
-                param => param is Pedido ped && ped.IsFinalizado && ped.Status != StatusPedido.Pago
-            );
-            MarcarEnviadoCommand = new RelayCommand(
-                param => MarcarEnviado(param as Pedido),
-                param => param is Pedido ped && ped.IsFinalizado
-            );
-            MarcarRecebidoCommand = new RelayCommand(
-                param => MarcarRecebido(param as Pedido),
-                param => param is Pedido ped && ped.IsFinalizado
-            );
-
-            AplicarFiltrosPedidosCommand = new RelayCommand(RecarregarPedidosDaPessoa);
-
-            CarregarPessoas();
-            CarregarProdutos();
+            Carregar();
         }
 
-        private void CarregarPessoas()
+        // Construtor usado pelo MainViewModel com repositórios injetados
+        public PessoasViewModel(PessoaRepository pessoaRepo, ProdutoRepository? produtoRepo, PedidoRepository? pedidoRepo)
         {
-            Pessoas.Clear();
-            foreach (var p in _pessoasRepo.GetAll())
-                Pessoas.Add(p);
+            _repository = pessoaRepo;
+            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            _pedidoRepo = pedidoRepo ?? new PedidoRepository(Path.Combine(baseDir, "Data", "pedidos.json"));
+            _produtoRepo = produtoRepo ?? new ProdutoRepository(Path.Combine(baseDir, "Data", "produtos.json"));
+
+            // Comandos Pessoas
+            CarregarCommand = new RelayCommand(_ => Carregar());
+            BuscarCommand = new RelayCommand(_ => Buscar());
+            AbrirModalAddPessoaCommand = new RelayCommand(_ => AbrirModalAddPessoa());
+            FecharModalAddPessoaCommand = new RelayCommand(_ => FecharModalAddPessoa());
+            SalvarPessoaModalCommand = new RelayCommand(_ => SalvarPessoaModal(), _ => CanSalvarPessoa());
+            EditarCommand = new RelayCommand(p => { if (p is Pessoa pes) Editar(pes); });
+            ExcluirCommand = new RelayCommand(p => { if (p is Pessoa pes) Excluir(pes); });
+            // Aliases inline
+            IncluirCommand = new RelayCommand(_ => AbrirModalAddPessoa());
+            SalvarCommand = new RelayCommand(_ => SalvarPessoaModal(), _ => CanSalvarPessoa());
+
+            // Comandos Pedidos
+            IncluirPedidoCommand = new RelayCommand(_ => IncluirPedido());
+            AdicionarItemPedidoCommand = new RelayCommand(_ => AdicionarItemPedido());
+            RemoverItemPedidoCommand = new RelayCommand(_ => RemoverItemPedido());
+            FinalizarPedidoCommand = new RelayCommand(_ => FinalizarPedido());
+            CancelarInclusaoPedidoCommand = new RelayCommand(_ => CancelarInclusaoPedido());
+            MarcarPagoCommand = new RelayCommand(p => MarcarStatus(p, StatusPedido.Pago));
+            MarcarEnviadoCommand = new RelayCommand(p => MarcarStatus(p, StatusPedido.Enviado));
+            MarcarRecebidoCommand = new RelayCommand(p => MarcarStatus(p, StatusPedido.Recebido));
+            AplicarFiltrosPedidosCommand = new RelayCommand(_ => AplicarFiltrosPedidos());
+
+            Carregar();
         }
 
-        private void CarregarProdutos()
+        private void Carregar()
         {
-            Produtos.Clear();
-            foreach (var pr in _produtosRepo.GetAll())
-                Produtos.Add(pr);
+            try
+            {
+                var pessoas = _repository.GetAll();
+                Pessoas.Clear();
+                foreach (var p in pessoas)
+                {
+                    Pessoas.Add(p);
+                }
+                CarregarPedidosDaPessoa();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Erro ao carregar pessoas: {ex.Message}",
+                    "Erro",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
         }
 
         private void Buscar()
         {
-            Pessoas.Clear();
-            foreach (var p in _pessoasRepo.Buscar(FiltroNome, FiltroCpf))
-                Pessoas.Add(p);
+            try
+            {
+                var resultado = _repository.Buscar(FiltroNome, FiltroCpf);
+
+                Pessoas.Clear();
+                foreach (var p in resultado)
+                {
+                    Pessoas.Add(p);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Erro ao buscar pessoas: {ex.Message}",
+                    "Erro",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
         }
 
-        private void Incluir()
+        private void AbrirModalAddPessoa()
         {
             EditBuffer = new Pessoa();
-            IsEditando = true;
+            IsModalAddPessoaVisible = true;
         }
 
-        private void Editar()
+        private void FecharModalAddPessoa()
         {
-            if (PessoaSelecionada == null) return;
-            EditBuffer = new Pessoa
-            {
-                Id = PessoaSelecionada.Id,
-                Nome = PessoaSelecionada.Nome,
-                Cpf = PessoaSelecionada.Cpf,
-                Endereco = PessoaSelecionada.Endereco
-            };
-            IsEditando = true;
+            IsModalAddPessoaVisible = false;
+            EditBuffer = new Pessoa();
         }
 
-        private void Salvar()
+        private bool CanSalvarPessoa()
+        {
+            if (EditBuffer == null) return false;
+            if (string.IsNullOrWhiteSpace(EditBuffer.Nome)) return false;
+            if (string.IsNullOrWhiteSpace(EditBuffer.Cpf)) return false;
+            return CpfValidator.IsValid(EditBuffer.Cpf);
+        }
+
+        private void SalvarPessoaModal()
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(EditBuffer.Nome))
+                if (!CanSalvarPessoa())
                 {
-                    MessageBox.Show("Nome é obrigatório.");
-                    return;
-                }
-                if (!CpfValidator.IsValid(EditBuffer.Cpf))
-                {
-                    MessageBox.Show("CPF inválido.");
+                    MessageBox.Show(
+                        "Preencha corretamente Nome e CPF válido.",
+                        "Validação",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
                     return;
                 }
 
                 if (EditBuffer.Id == 0)
                 {
-                    var adicionada = _pessoasRepo.Add(EditBuffer);
-                    Pessoas.Add(adicionada);
-                    PessoaSelecionada = adicionada;
+                    _repository.Add(EditBuffer);
                 }
                 else
                 {
-                    _pessoasRepo.Update(EditBuffer);
-                    var idx = Pessoas.ToList().FindIndex(p => p.Id == EditBuffer.Id);
-                    if (idx >= 0)
-                    {
-                        Pessoas[idx] = EditBuffer;
-                        PessoaSelecionada = EditBuffer;
-                    }
+                    _repository.Update(EditBuffer);
                 }
 
-                IsEditando = false;
+                Carregar();
+                FecharModalAddPessoa();
+
+                MessageBox.Show(
+                    "Pessoa salva com sucesso!",
+                    "Sucesso",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Erro ao salvar: {ex.Message}");
+                MessageBox.Show(
+                    $"Erro ao salvar pessoa: {ex.Message}",
+                    "Erro",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
         }
 
-        private void Excluir()
+        private void Editar(Pessoa pessoa)
         {
-            if (PessoaSelecionada == null) return;
-            if (MessageBox.Show($"Excluir {PessoaSelecionada.Nome}?", "Confirmação",
-                                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-                return;
+            if (pessoa == null) return;
 
-            if (_pessoasRepo.Delete(PessoaSelecionada.Id))
+            EditBuffer = new Pessoa
             {
-                Pessoas.Remove(PessoaSelecionada);
-                PessoaSelecionada = null;
-                PedidosDaPessoa.Clear();
+                Id = pessoa.Id,
+                Nome = pessoa.Nome,
+                Cpf = pessoa.Cpf,
+                Endereco = pessoa.Endereco
+            };
+
+            IsModalAddPessoaVisible = true;
+        }
+
+        private void Excluir(Pessoa pessoa)
+        {
+            if (pessoa == null) return;
+
+            var result = MessageBox.Show(
+                $"Deseja realmente excluir {pessoa.Nome}?",
+                "Confirmar Exclusão",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    _repository.Delete(pessoa.Id);
+                    Carregar();
+
+                    MessageBox.Show(
+                        "Pessoa excluída com sucesso!",
+                        "Sucesso",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(
+                        $"Erro ao excluir pessoa: {ex.Message}",
+                        "Erro",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                }
             }
         }
 
-        // Inclusão de Pedido inline
-        private void IniciarInclusaoPedido()
+        // ====== Pedidos: funcionalidades ======
+        private void CarregarPedidosDaPessoa()
+        {
+            PedidosDaPessoa.Clear();
+            if (PessoaSelecionada == null) return;
+            foreach (var p in _pedidoRepo.BuscarPorPessoa(PessoaSelecionada.Id))
+                PedidosDaPessoa.Add(p);
+        }
+
+        private void IncluirPedido()
         {
             if (PessoaSelecionada == null)
             {
-                MessageBox.Show("Selecione uma pessoa para incluir o pedido.");
+                MessageBox.Show("Selecione uma pessoa antes.");
                 return;
             }
 
-            ItensPedidoEmEdicao.Clear();
-            ProdutoSelecionadoParaAdicionar = null;
-            QtdeParaAdicionar = 1;
-            FormaPagamentoSelecionada = FormaPagamento.Dinheiro;
-            TotalPedidoEmEdicao = 0m;
+            Produtos.Clear();
+            foreach (var pr in _produtoRepo.GetAll()) Produtos.Add(pr);
 
+            ItensPedidoEmEdicao.Clear();
+            QtdeParaAdicionar = 1;
+            ProdutoSelecionadoParaAdicionar = null;
+            FormaPagamentoSelecionada = "Dinheiro";
+            TotalPedidoEmEdicao = 0m;
             IsIncluindoPedido = true;
         }
 
         private void AdicionarItemPedido()
         {
-            if (ProdutoSelecionadoParaAdicionar == null || QtdeParaAdicionar <= 0) return;
-
+            if (!IsIncluindoPedido || ProdutoSelecionadoParaAdicionar == null || QtdeParaAdicionar <= 0) return;
             var existente = ItensPedidoEmEdicao.FirstOrDefault(i => i.ProdutoId == ProdutoSelecionadoParaAdicionar.Id);
             if (existente != null)
             {
@@ -361,142 +438,121 @@ namespace WpfApp.ViewModels
                     ValorUnitario = ProdutoSelecionadoParaAdicionar.Valor
                 });
             }
-            RecalcularTotalPedidoEmEdicao();
+
             QtdeParaAdicionar = 1;
+            RecalcularTotalPedido();
         }
 
         private void RemoverItemPedido()
         {
             if (ItemSelecionadoEmEdicao == null) return;
             ItensPedidoEmEdicao.Remove(ItemSelecionadoEmEdicao);
-            RecalcularTotalPedidoEmEdicao();
+            RecalcularTotalPedido();
         }
 
-        private void RecalcularTotalPedidoEmEdicao()
+        private void RecalcularTotalPedido()
         {
             TotalPedidoEmEdicao = ItensPedidoEmEdicao.Sum(i => i.TotalItem);
         }
 
         private void FinalizarPedido()
         {
-            try
+            if (!IsIncluindoPedido) return;
+            if (PessoaSelecionada == null)
             {
-                if (PessoaSelecionada == null)
-                {
-                    MessageBox.Show("Selecione uma pessoa.");
-                    return;
-                }
-                if (!ItensPedidoEmEdicao.Any())
-                {
-                    MessageBox.Show("Adicione ao menos um item.");
-                    return;
-                }
-
-                var pedido = new Pedido
-                {
-                    PessoaId = PessoaSelecionada.Id,
-                    PessoaNome = PessoaSelecionada.Nome,
-                    Itens = ItensPedidoEmEdicao.ToList(),
-                    ValorTotal = ItensPedidoEmEdicao.Sum(i => i.TotalItem),
-                    DataVenda = DateTime.Now,
-                    FormaPagamento = FormaPagamentoSelecionada,
-                    Status = StatusPedido.Pendente,
-                    IsFinalizado = true
-                };
-
-                var salvo = _pedidosRepo.Add(pedido);
-
-                // Atualiza a lista da pessoa
-                PedidosDaPessoa.Insert(0, salvo);
-
-                // Sai do modo de inclusão
-                IsIncluindoPedido = false;
-
-                MessageBox.Show("Pedido finalizado e salvo com sucesso.");
+                MessageBox.Show("Selecione uma pessoa.");
+                return;
             }
-            catch (Exception ex)
+            if (ItensPedidoEmEdicao.Count == 0)
             {
-                MessageBox.Show($"Erro ao finalizar pedido: {ex.Message}");
+                MessageBox.Show("Adicione pelo menos um item.");
+                return;
             }
+
+            var forma = FormaPagamento.Dinheiro;
+            if (Enum.TryParse<FormaPagamento>(FormaPagamentoSelecionada, out var fp))
+                forma = fp;
+
+            var pedido = new Pedido
+            {
+                PessoaId = PessoaSelecionada.Id,
+                PessoaNome = PessoaSelecionada.Nome,
+                DataVenda = DateTime.Now,
+                Status = StatusPedido.Pendente,
+                FormaPagamento = forma,
+                IsFinalizado = true,
+                Itens = ItensPedidoEmEdicao.Select(i => new PedidoItem
+                {
+                    ProdutoId = i.ProdutoId,
+                    ProdutoNome = i.ProdutoNome,
+                    Quantidade = i.Quantidade,
+                    ValorUnitario = i.ValorUnitario
+                }).ToList()
+            };
+            pedido.ValorTotal = pedido.Itens.Sum(i => i.TotalItem);
+
+            var salvo = _pedidoRepo.Add(pedido);
+            PedidosDaPessoa.Insert(0, salvo);
+
+            CancelarInclusaoPedido();
         }
 
         private void CancelarInclusaoPedido()
         {
-            // Descarta o rascunho (nada foi salvo)
             IsIncluindoPedido = false;
             ItensPedidoEmEdicao.Clear();
+            ProdutoSelecionadoParaAdicionar = null;
+            QtdeParaAdicionar = 1;
             TotalPedidoEmEdicao = 0m;
         }
 
-        // Pedidos da Pessoa
-        private void RecarregarPedidosDaPessoa()
+        private void MarcarStatus(object? param, StatusPedido status)
         {
-            PedidosDaPessoa.Clear();
+            if (param is not Pedido ped) return;
+            if (ped.IsFinalizado)
+            {
+                MessageBox.Show("Pedido finalizado não pode ter o status alterado.");
+                return;
+            }
+            ped.Status = status;
+            _pedidoRepo.Update(ped);
+            var idx = PedidosDaPessoa.ToList().FindIndex(p => p.Id == ped.Id);
+            if (idx >= 0) PedidosDaPessoa[idx] = ped;
+        }
+
+        private void AplicarFiltrosPedidos()
+        {
             if (PessoaSelecionada == null)
-                return;
-
-            var pedidos = _pedidosRepo.BuscarPorPessoa(PessoaSelecionada.Id);
-
-            // Aplicar filtros rápidos
-            if (MostrarApenasRecebidos)
-                pedidos = pedidos.Where(p => p.Status == StatusPedido.Recebido);
-            if (MostrarApenasPagos)
-                pedidos = pedidos.Where(p => p.Status == StatusPedido.Pago);
-            if (MostrarApenasPendentes)
-                pedidos = pedidos.Where(p => p.Status == StatusPedido.Pendente);
-
-            foreach (var ped in pedidos)
-                PedidosDaPessoa.Add(ped);
-        }
-
-        // Ações por linha
-        private void MarcarPago(Pedido ped)
-        {
-            if (ped == null) return;
-            if (!ped.IsFinalizado)
             {
-                MessageBox.Show("Finalize o pedido antes de marcar como Pago.");
+                PedidosDaPessoa.Clear();
                 return;
             }
 
-            ped.Status = StatusPedido.Pago;
-            _pedidosRepo.Update(ped);
-            AtualizarPedidoNaColecao(ped);
-        }
+            var todos = _pedidoRepo.BuscarPorPessoa(PessoaSelecionada.Id).ToList();
+            var filtrado = todos.AsEnumerable();
 
-        private void MarcarEnviado(Pedido ped)
-        {
-            if (ped == null) return;
-            if (!ped.IsFinalizado)
+            var usarRecebidos = MostrarApenasRecebidos;
+            var usarPagos = MostrarApenasPagos;
+            var usarPendentes = MostrarApenasPendentes;
+
+            if (usarRecebidos || usarPagos || usarPendentes)
             {
-                MessageBox.Show("Finalize o pedido antes de marcar como Enviado.");
-                return;
+                filtrado = filtrado.Where(p =>
+                    (usarRecebidos && p.Status == StatusPedido.Recebido) ||
+                    (usarPagos && p.Status == StatusPedido.Pago) ||
+                    (usarPendentes && p.Status == StatusPedido.Pendente));
             }
 
-            ped.Status = StatusPedido.Enviado;
-            _pedidosRepo.Update(ped);
-            AtualizarPedidoNaColecao(ped);
+            PedidosDaPessoa.Clear();
+            foreach (var p in filtrado.OrderByDescending(p => p.DataVenda ?? DateTime.MinValue))
+                PedidosDaPessoa.Add(p);
         }
 
-        private void MarcarRecebido(Pedido ped)
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
-            if (ped == null) return;
-            if (!ped.IsFinalizado)
-            {
-                MessageBox.Show("Finalize o pedido antes de marcar como Recebido.");
-                return;
-            }
-
-            ped.Status = StatusPedido.Recebido;
-            _pedidosRepo.Update(ped);
-            AtualizarPedidoNaColecao(ped);
-        }
-
-        private void AtualizarPedidoNaColecao(Pedido ped)
-        {
-            var idx = PedidosDaPessoa.ToList().FindIndex(x => x.Id == ped.Id);
-            if (idx >= 0)
-                PedidosDaPessoa[idx] = ped;
+            if (propertyName == null) return;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 }

@@ -7,6 +7,11 @@ public class MainViewModel : BaseViewModel
     public ProdutosViewModel ProdutosVM { get; }
     public PedidosViewModel PedidosVM { get; }
 
+    // Alias properties to align with XAML bindings expecting *ViewModel names
+    public PessoasViewModel PessoasViewModel => PessoasVM;
+    public ProdutosViewModel ProdutosViewModel => ProdutosVM;
+    public PedidosViewModel PedidosViewModel => PedidosVM;
+
     public MainViewModel(PessoaRepository pessoaRepo,
                          ProdutoRepository produtoRepo,
                          PedidoRepository pedidoRepo)

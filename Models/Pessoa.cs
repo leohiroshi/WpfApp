@@ -18,5 +18,29 @@ namespace WpfApp.Models
         public  string Cpf { get; set; } = string.Empty;
 
         public string? Endereco { get; set; }
+
+        public string Iniciais
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(Nome))
+                    return "??";
+
+                var palavras = Nome.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                if (palavras.Length >= 2)
+                {
+                    return $"{palavras[0][0]}{palavras[1][0]}".ToUpper();
+                }
+                else if (palavras.Length == 1 && palavras[0].Length >= 2)
+                {
+                    return palavras[0].Substring(0, 2).ToUpper();
+                }
+                else if (palavras.Length == 1 && palavras[0].Length == 1)
+                {
+                    return palavras[0].ToUpper();
+                }
+                return "??";
+            }
+        }
     }
 }

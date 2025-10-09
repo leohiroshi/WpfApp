@@ -14,7 +14,7 @@ namespace WpfApp.ViewModels
 
         public ObservableCollection<Produto> Produtos { get; } = new();
 
-        private Produto _produtoSelecionado;
+    private Produto? _produtoSelecionado;
         public Produto? ProdutoSelecionado
         {
             get => _produtoSelecionado;
@@ -75,6 +75,13 @@ namespace WpfApp.ViewModels
             }
         }
 
+        private bool _isModalAddProdutoVisible;
+        public bool IsModalAddProdutoVisible
+        {
+            get => _isModalAddProdutoVisible;
+            set => SetProperty(ref _isModalAddProdutoVisible, value);
+        }
+
         // Comandos
         public RelayCommand CarregarCommand { get; }
         public RelayCommand BuscarCommand { get; }
@@ -82,6 +89,9 @@ namespace WpfApp.ViewModels
         public RelayCommand EditarCommand { get; }
         public RelayCommand SalvarCommand { get; }
         public RelayCommand ExcluirCommand { get; }
+        public RelayCommand AbrirModalAddProdutoCommand { get; }
+        public RelayCommand FecharModalAddProdutoCommand { get; }
+        public RelayCommand SalvarProdutoModalCommand { get; }
 
         public ProdutosViewModel(ProdutoRepository produtosRepo)
         {
@@ -93,6 +103,9 @@ namespace WpfApp.ViewModels
             EditarCommand = new RelayCommand(Editar, () => ProdutoSelecionado != null && !IsEditando);
             SalvarCommand = new RelayCommand(Salvar, () => IsEditando);
             ExcluirCommand = new RelayCommand(Excluir, () => ProdutoSelecionado != null && !IsEditando);
+            AbrirModalAddProdutoCommand = new RelayCommand(AbrirModalAddProduto);
+            FecharModalAddProdutoCommand = new RelayCommand(FecharModalAddProduto);
+            SalvarProdutoModalCommand = new RelayCommand(SalvarProdutoModal);
 
             CarregarProdutos();
         }
@@ -140,26 +153,30 @@ namespace WpfApp.ViewModels
             IsEditando = true;
         }
 
+        private string? ValidarProduto(Produto produto)
+        {
+            if (produto == null) return "Produto inválido.";
+
+            if (string.IsNullOrWhiteSpace(produto.Nome))
+                return "Nome é obrigatório.";
+
+            if (string.IsNullOrWhiteSpace(produto.Codigo))
+                return "Código é obrigatório.";
+
+            if (produto.Valor <= 0)
+                return "Valor deve ser maior que zero.";
+
+            return null;
+        }
+
         private void Salvar()
         {
             try
             {
-                // Validações
-                if (string.IsNullOrWhiteSpace(EditBuffer.Nome))
+                var erro = ValidarProduto(EditBuffer);
+                if (erro != null)
                 {
-                    MessageBox.Show("Nome é obrigatório.");
-                    return;
-                }
-
-                if (string.IsNullOrWhiteSpace(EditBuffer.Codigo))
-                {
-                    MessageBox.Show("Código é obrigatório.");
-                    return;
-                }
-
-                if (EditBuffer.Valor <= 0)
-                {
-                    MessageBox.Show("Valor deve ser maior que zero.");
+                    MessageBox.Show(erro);
                     return;
                 }
 
@@ -202,6 +219,41 @@ namespace WpfApp.ViewModels
             {
                 Produtos.Remove(ProdutoSelecionado);
                 ProdutoSelecionado = null;
+            }
+        }
+
+        private void AbrirModalAddProduto()
+        {
+            EditBuffer = new Produto();
+            IsModalAddProdutoVisible = true;
+        }
+
+        private void FecharModalAddProduto()
+        {
+            IsModalAddProdutoVisible = false;
+        }
+
+        private void SalvarProdutoModal()
+        {
+            try
+            {
+                var erro = ValidarProduto(EditBuffer);
+                if (erro != null)
+                {
+                    MessageBox.Show(erro);
+                    return;
+                }
+
+                var adicionado = _produtosRepo.Add(EditBuffer);
+                Produtos.Add(adicionado);
+                ProdutoSelecionado = adicionado;
+
+                IsModalAddProdutoVisible = false;
+                MessageBox.Show("Produto adicionado com sucesso!", "Sucesso", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erro ao salvar produto: {ex.Message}");
             }
         }
     }
