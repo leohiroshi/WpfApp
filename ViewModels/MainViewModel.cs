@@ -6,7 +6,6 @@ namespace WpfApp.ViewModels
     {
         public PessoasViewModel PessoasVM { get; }
         public ProdutosViewModel ProdutosVM { get; }
-        // Se tiver uma aba “Pedidos”, crie também um PedidosViewModel
 
         public MainViewModel(PessoaRepository pessoaRepo,
                              ProdutoRepository produtoRepo,

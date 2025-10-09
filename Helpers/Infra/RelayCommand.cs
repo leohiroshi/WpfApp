@@ -1,9 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System;
 using System.Windows.Input;
 
 namespace WpfApp.Infra
@@ -15,6 +10,7 @@ namespace WpfApp.Infra
 
         public RelayCommand(Action execute, Func<bool>? canExecute = null)
         {
+            if (execute == null) throw new ArgumentNullException(nameof(execute));
             _execute = _ => execute();
             _canExecute = canExecute is null ? null : (_ => canExecute());
         }
@@ -26,12 +22,19 @@ namespace WpfApp.Infra
         }
 
         public bool CanExecute(object? parameter) => _canExecute?.Invoke(parameter) ?? true;
+
         public void Execute(object? parameter) => _execute(parameter);
 
         public event EventHandler? CanExecuteChanged
         {
             add { CommandManager.RequerySuggested += value; }
             remove { CommandManager.RequerySuggested -= value; }
+        }
+
+        // Método que força a UI a reavaliar CanExecute
+        public void RaiseCanExecuteChanged()
+        {
+            CommandManager.InvalidateRequerySuggested();
         }
     }
 }
